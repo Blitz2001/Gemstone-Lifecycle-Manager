@@ -9,10 +9,12 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Loader2, AlertCircle } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 export default function LoginPage() {
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const router = useRouter()
 
     const handleSubmit = async (formData: FormData) => {
         setLoading(true)
@@ -28,7 +30,12 @@ export default function LoginPage() {
                 setError(result.error)
                 setLoading(false)
             }
-            // If success, the server action redirects, so we don't need to do anything here
+            if (result?.error) {
+                setError(result.error)
+                setLoading(false)
+            } else if (result?.success) {
+                router.push('/')
+            }
         } catch (e) {
             setError('An unexpected error occurred')
             setLoading(false)
