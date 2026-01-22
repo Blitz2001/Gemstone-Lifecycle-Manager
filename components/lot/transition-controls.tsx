@@ -16,7 +16,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card } from '@/components/ui/card'
-import { ElectricBurnForm } from './forms/electric-burn-form'
+import { BreakdownForm } from './forms/breakdown-form'
 import { SellReadyForm } from './forms/sell-ready-form'
 import { SoldForm } from './forms/sold-form'
 import { LockOpen, ShoppingCart } from 'lucide-react'
@@ -36,6 +36,7 @@ export function TransitionControls({ lotId, currentStage, isFinalized, compositi
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [cost, setCost] = useState<string>('')
+    const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0])
     const [weightInputs, setWeightInputs] = useState<Record<string, string>>({})
     const [piecesInputs, setPiecesInputs] = useState<Record<string, string>>({})
     const [mounted, setMounted] = useState(false)
@@ -46,8 +47,8 @@ export function TransitionControls({ lotId, currentStage, isFinalized, compositi
         carats: '', pieces: '', price: '', buyer: '', notes: ''
     })
 
-    // State for Electric Burn Data
-    const [electricBurnData, setElectricBurnData] = useState<any>(null)
+    // State for Breakdown Data (Gas Burn & Electric Burn)
+    const [breakdownData, setBreakdownData] = useState<any>(null)
 
     // ... (Handlers)
 
@@ -101,9 +102,9 @@ export function TransitionControls({ lotId, currentStage, isFinalized, compositi
     // State for Sold Data
     const [soldData, setSoldData] = useState<any>(null)
 
-    // Stable handler to prevent infinite loop in ElectricBurnForm effect
-    const onElectricBurnChange = useCallback((data: any) => {
-        setElectricBurnData(data)
+    // Stable handler to prevent infinite loop in BreakdownForm effect
+    const onBreakdownChange = useCallback((data: any) => {
+        setBreakdownData(data)
     }, [])
 
     const onSellReadyChange = useCallback((data: any) => {
@@ -176,27 +177,52 @@ export function TransitionControls({ lotId, currentStage, isFinalized, compositi
 
         let data: any = {}
         let totalNewWeight = 0
-        const finalCost = Number(cost) || 0
+        const costPerCt = Number(cost) || 0
 
-        if (nextStage === LotStage.ELECTRIC_BURN) {
-            // Validate specific form data
-            if (!electricBurnData?.breakdown || electricBurnData.breakdown.length === 0) {
-                setError("Please add at least one result entry.")
+        if (nextStage === LotStage.GAS_BURN || nextStage === LotStage.ELECTRIC_BURN) {
+            // Validate specific form data (Breakdown)
+            // Ensure we filter out any 0-carat entries (e.g. remainders entered as 0 or empty rows)
+            // This prevents "consumed" stones from appearing as results or being carried over.
+            const userEnteredRows = (breakdownData?.breakdown || [])
+                .filter((r: any) => (r.carats || 0) > 0)
+
+            // Note: We'll check if we have ANY data (user entered OR auto-carryover) after calculating auto-carryover.
+
+            // --- AUTO-CARRYOVER LOGIC ---
+            // Identify stones from composition that were NOT touched (neither as transformed source nor remainder)
+            // and automatically add them to the next stage.
+            const touchedKeys = new Set(userEnteredRows.map((r: any) => r.source_type).filter(Boolean))
+            const autoCarryOver: any[] = []
+
+            Object.entries(composition || {}).forEach(([key, stats]) => {
+                if (!touchedKeys.has(key)) {
+                    // This stone type was ignored by the user -> assume it passes through unchanged.
+                    autoCarryOver.push({
+                        color: key,            // Maintain the full key name (e.g. "Royal Blue IF")
+                        clarity: '-',          // Default clarity for source types
+                        source_type: key,      // Track lineage
+                        pieces: stats.pieces,
+                        carats: stats.carats
+                    })
+                }
+            })
+
+            // Merge auto-carryover items into breakdown
+            breakdownData.breakdown = [...userEnteredRows, ...autoCarryOver]
+
+            // Re-validate final payload
+            if (breakdownData.breakdown.length === 0) {
+                setError("No data to transition.")
                 setLoading(false)
                 return
             }
-            // Ensure all rows have valid data
-            const validRows = electricBurnData.breakdown.filter((r: any) => r.color && r.clarity && r.carats > 0)
-            if (validRows.length !== electricBurnData.breakdown.length) {
-                setError("Please ensure all rows have Color, Clarity and Weight.")
-                setLoading(false)
-                return
-            }
 
-            data = electricBurnData
+            // Ensure all rows have valid data (should be valid now)
+            const validRows = breakdownData.breakdown.filter((r: any) => r.color && r.carats > 0)
+
+            data = breakdownData
             totalNewWeight = validRows.reduce((sum: number, r: any) => sum + r.carats, 0)
             data.new_weight = totalNewWeight
-
         } else if (nextStage === LotStage.SELL_READY) {
             // Validate Sell Ready Data
             if (!sellReadyData?.valuations || sellReadyData.valuations.length === 0) {
@@ -243,8 +269,10 @@ export function TransitionControls({ lotId, currentStage, isFinalized, compositi
             }
         }
 
+        const finalCost = costPerCt * totalNewWeight
+
         try {
-            const result = await transitionLotStage(lotId, nextStage, data, finalCost)
+            const result = await transitionLotStage(lotId, nextStage, data, finalCost, date)
             if (!result.success) {
                 setError(result.error || 'Transition failed')
             } else {
@@ -272,7 +300,7 @@ export function TransitionControls({ lotId, currentStage, isFinalized, compositi
 
     return (
         <Card className="p-4 bg-muted/50 border-dashed">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
                 <div>
                     <h3 className="font-semibold">Workflow Actions</h3>
                     <p className="text-sm text-muted-foreground">Move to next stage: {STAGE_DISPLAY_NAMES[nextStage]}</p>
@@ -287,7 +315,7 @@ export function TransitionControls({ lotId, currentStage, isFinalized, compositi
                             <DialogTitle>Confirm Transition</DialogTitle>
                             <DialogDescription>
                                 Moving from {STAGE_DISPLAY_NAMES[workingStage]} to {STAGE_DISPLAY_NAMES[nextStage]}.
-                                {workingStage === LotStage.ELECTRIC_BURN
+                                {(nextStage === LotStage.GAS_BURN || nextStage === LotStage.ELECTRIC_BURN)
                                     ? " Enter the detailed breakdown of the resulting stones."
                                     : nextStage === LotStage.SELL_READY
                                         ? " Enter valuation and predicted pricing."
@@ -300,24 +328,63 @@ export function TransitionControls({ lotId, currentStage, isFinalized, compositi
                         <div className="grid gap-4 py-4">
                             {error && <div className="text-red-500 text-sm">{error}</div>}
 
-                            {/* NEW: Cost Input for ALL Stages */}
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="cost" className="text-right">Processing Cost</Label>
-                                <Input
-                                    id="cost"
-                                    type="number"
-                                    placeholder="0.00"
-                                    className="col-span-3"
-                                    value={cost}
-                                    onChange={(e) => setCost(e.target.value)}
-                                />
+                            {/* NEW: Date and Cost Inputs */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="date" className="text-right">Date</Label>
+                                    <Input
+                                        id="date"
+                                        type="date"
+                                        className="col-span-3"
+                                        value={date}
+                                        onChange={(e) => setDate(e.target.value)}
+                                    />
+                                </div>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="cost" className="text-right">Cost<br /><span className="text-xs text-muted-foreground">(/Ct)</span></Label>
+                                    <div className="col-span-3 space-y-1">
+                                        <Input
+                                            id="cost"
+                                            type="number"
+                                            placeholder="0.00"
+                                            value={cost}
+                                            onChange={(e) => setCost(e.target.value)}
+                                        />
+                                        {/* Preview Total Cost */}
+                                        {(() => {
+                                            let estimatedWeight = 0
+                                            if (nextStage === LotStage.GAS_BURN || nextStage === LotStage.ELECTRIC_BURN) {
+                                                const manual = (breakdownData?.breakdown || [])
+                                                    .filter((r: any) => (r.carats || 0) > 0)
+                                                    .reduce((sum: number, r: any) => sum + Number(r.carats), 0)
+                                                estimatedWeight = manual
+                                            } else {
+                                                estimatedWeight = Object.entries(composition || {}).reduce((sum, [type, stats]) => {
+                                                    const cw = weightInputs[type] ? Number(weightInputs[type]) : stats.carats
+                                                    return sum + cw
+                                                }, 0)
+                                            }
+
+                                            const total = (Number(cost) || 0) * estimatedWeight
+
+                                            // Conditional minimal display
+                                            if (!cost) return null
+
+                                            return (
+                                                <div className="text-xs text-right text-muted-foreground leading-tight">
+                                                    Est: {estimatedWeight.toFixed(2)}ct × {cost} = <b>{total.toLocaleString()}</b>
+                                                </div>
+                                            )
+                                        })()}
+                                    </div>
+                                </div>
                             </div>
 
-                            {/* ELECTRIC BURN: Show Detailed Breakdown Form */}
-                            {nextStage === LotStage.ELECTRIC_BURN ? (
-                                <ElectricBurnForm
+                            {/* ELECTRIC BURN / GAS BURN: Show Detailed Breakdown Form */}
+                            {(nextStage === LotStage.GAS_BURN || nextStage === LotStage.ELECTRIC_BURN) ? (
+                                <BreakdownForm
                                     composition={composition}
-                                    onChange={onElectricBurnChange}
+                                    onChange={onBreakdownChange}
                                 />
                             ) : nextStage === LotStage.SELL_READY ? (
                                 /* SELL READY: Valuation Form */
@@ -340,14 +407,17 @@ export function TransitionControls({ lotId, currentStage, isFinalized, compositi
                                         <div className="col-span-2 text-center">Prev (ct/pc)</div>
                                         <div className="col-span-2 text-center">New Pcs</div>
                                         <div className="col-span-2 text-center">New Wgt</div>
-                                        <div className="col-span-3 text-right">Loss</div>
+                                        <div className="col-span-2 text-right">Wgt Loss</div>
+                                        <div className="col-span-1 text-right">Pcs Diff</div>
                                     </div>
                                     {Object.entries(composition || {}).map(([type, stats]) => {
                                         const currentWeight = weightInputs[type] ? Number(weightInputs[type]) : stats.carats
-                                        // const currentPieces = piecesInputs[type] ? Number(piecesInputs[type]) : stats.pieces // Not used for calc yet
+                                        const currentPieces = piecesInputs[type] ? Number(piecesInputs[type]) : stats.pieces
 
-                                        const loss = stats.carats - currentWeight
-                                        const lossPercent = stats.carats > 0 ? (loss / stats.carats) * 100 : 0
+                                        const weightLoss = stats.carats - currentWeight
+                                        const weightLossPercent = stats.carats > 0 ? (weightLoss / stats.carats) * 100 : 0
+
+                                        const pcsDiff = currentPieces - stats.pieces
 
                                         return (
                                             <div key={type} className="grid grid-cols-12 gap-2 p-2 items-center text-sm border-b last:border-0">
@@ -372,8 +442,11 @@ export function TransitionControls({ lotId, currentStage, isFinalized, compositi
                                                         onChange={(e) => handleWeightChange(type, e.target.value)}
                                                     />
                                                 </div>
-                                                <div className={`col-span-3 text-right font-medium ${loss > 0 ? 'text-red-500' : 'text-green-500'}`}>
-                                                    {loss.toFixed(2)} <span className="text-xs text-muted-foreground">({lossPercent.toFixed(1)}%)</span>
+                                                <div className={`col-span-2 text-right font-medium ${weightLoss > 0 ? 'text-red-500' : 'text-green-500'}`}>
+                                                    {weightLoss.toFixed(2)} <span className="text-xs text-muted-foreground">({weightLossPercent.toFixed(1)}%)</span>
+                                                </div>
+                                                <div className={`col-span-1 text-right text-xs font-medium ${pcsDiff !== 0 ? 'text-blue-500' : 'text-muted-foreground'}`}>
+                                                    {pcsDiff > 0 ? `+${pcsDiff}` : pcsDiff}
                                                 </div>
                                             </div>
                                         )

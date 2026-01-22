@@ -9,6 +9,7 @@ import { StageTimeline } from '@/components/lot/stage-timeline'
 import { LotCompositionDisplay } from '@/components/lot/lot-composition-display'
 import { TransformationLineage } from '@/components/lot/transformation-lineage'
 import { ValuationSummary } from '@/components/lot/valuation-summary'
+import { GasBurnReport } from '@/components/lot/gas-burn-report'
 import { SaleSummary } from '@/components/lot/sale-summary'
 import { EvidenceUpload } from '@/components/lot/evidence-upload'
 import { extractMetrics } from '@/lib/metrics'
@@ -74,6 +75,20 @@ export default async function LotPage({ params }: { params: Promise<{ id: string
                         pieces: item.pieces || 0
                     }
                 })
+            } else if (log.stage === 'GAS_BURN' && log.data?.breakdown) {
+                // TRANSFORMATION (Gas Burn): Wipe previous and set new from Gas Burn results
+                currentComposition = {}
+                log.data.breakdown.forEach((item: any) => {
+                    // IF it's a source type (remainder), use JUST the name (e.g. "Silky Geuda")
+                    // ELSE use Color + Clarity (e.g. "Royal Blue IF")
+                    const isSourceType = initialComposition && initialComposition[item.color]
+                    const key = isSourceType ? item.color : `${item.color} ${item.clarity}`
+
+                    currentComposition[key] = {
+                        carats: item.carats,
+                        pieces: item.pieces || 0
+                    }
+                })
             } else if (log.data?.measurements) {
                 // If this stage recorded new measurements, update the tracking
                 Object.entries(log.data.measurements).forEach(([type, stats]: [string, any]) => {
@@ -118,14 +133,14 @@ export default async function LotPage({ params }: { params: Promise<{ id: string
             </div>
 
             {/* Main Header */}
-            <div className="flex justify-between items-start">
+            <div className="flex flex-col md:flex-row justify-between items-start gap-4">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">{lot.lot_code}</h1>
                     <p className="text-muted-foreground">
                         Created on {new Date(lot.created_at).toLocaleDateString(undefined, { dateStyle: 'long' })}
                     </p>
                 </div>
-                <div className="text-right">
+                <div className="text-left md:text-right">
                     <div className="text-sm text-muted-foreground uppercase tracking-widest">Current Stage</div>
                     <div className="text-2xl font-bold mb-1">
                         {(lot.current_stage === 'SELL_READY' && lot.is_finalized)
@@ -196,6 +211,28 @@ export default async function LotPage({ params }: { params: Promise<{ id: string
                     return null
                 })()}
 
+                {/* LOGIC: Find Gas Burn Data for Report */}
+                {(() => {
+                    // Get the LATEST gas burn log to reflect current state
+                    const gasBurnLogs = logs?.filter(l => l.stage === 'GAS_BURN' && l.data?.breakdown)
+                    const gasBurnLog = gasBurnLogs?.[gasBurnLogs.length - 1]
+
+                    if (gasBurnLog) {
+                        return (
+                            <div className="grid md:grid-cols-1 gap-4">
+                                <GasBurnReport
+                                    lotId={lot.id}
+                                    stageData={gasBurnLog.data}
+                                    initialComposition={initialComposition}
+                                    currentComposition={currentComposition}
+                                    currentStage={lot.current_stage}
+                                />
+                            </div>
+                        )
+                    }
+                    return null
+                })()}
+
                 {/* LOGIC: Find Sold Data (Final Results) */}
                 {(() => {
                     // PRIMARY: If Finalized in SELL_READY, the Sell Ready log contains the sale data
@@ -242,6 +279,89 @@ export default async function LotPage({ params }: { params: Promise<{ id: string
                                 />
                             </div>
                         )
+                    }
+                    return null
+                })()}
+
+                {/* LOGIC: Cut & Polish "Finished vs Unfinished" Intelligence */}
+                {(() => {
+                    const gasBurnLog = logs?.find(l => l.stage === 'GAS_BURN' && l.data?.breakdown)
+                    if (gasBurnLog && (lot.current_stage === 'CUT_POLISH' || lot.current_stage === 'ELECTRIC_BURN')) {
+                        const sourceKeys = Object.keys(initialComposition)
+
+                        // Use currentComposition to get the LIVE weights (sync with Report/Analysis)
+                        const finished: any[] = []
+                        const needsBurn: any[] = []
+
+                        Object.entries(currentComposition).forEach(([key, stats]) => {
+                            // Check if it's a source type (remainder)
+                            // Note: 'key' is "Color Clarity" or just "Color" for source types
+                            const isSource = sourceKeys.includes(key)
+
+                            const { pieces, carats } = stats as { pieces: number, carats: number }
+
+                            if (isSource) {
+                                needsBurn.push({ name: key, pieces, carats })
+                            } else {
+                                finished.push({ name: key, pieces, carats })
+                            }
+                        })
+
+                        if (finished.length > 0 || needsBurn.length > 0) {
+                            return (
+                                <div className="grid md:grid-cols-2 gap-4">
+                                    <div className="md:col-span-2">
+                                        <div className="rounded-lg border bg-card text-card-foreground shadow-sm">
+                                            <div className="flex flex-col space-y-1.5 p-6">
+                                                <h3 className="font-semibold leading-none tracking-tight">Processing Status (Post Gas Burn)</h3>
+                                                <p className="text-sm text-muted-foreground">Stones separated by color transformation response.</p>
+                                            </div>
+                                            <div className="p-6 pt-0 grid md:grid-cols-2 gap-6">
+                                                <div className="space-y-4">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="h-3 w-3 rounded-full bg-green-500" />
+                                                        <h4 className="font-medium text-sm">Finished Transformation (Ready to Sell)</h4>
+                                                    </div>
+                                                    {finished.length > 0 ? (
+                                                        <div className="space-y-2">
+                                                            {finished.map((item: any, idx: number) => (
+                                                                <div key={idx} className="text-sm border p-2 rounded bg-green-50/50 flex justify-between">
+                                                                    <span>{item.name}</span>
+                                                                    <span className="font-mono text-muted-foreground">{item.carats.toFixed(2)} ct</span>
+                                                                </div>
+                                                            ))}
+                                                            <div className="text-xs text-muted-foreground text-right border-t pt-2 mt-2">
+                                                                Total: {finished.reduce((a: number, b: any) => a + b.carats, 0).toFixed(2)} ct
+                                                            </div>
+                                                        </div>
+                                                    ) : <div className="text-sm text-muted-foreground italic">No finished stones.</div>}
+                                                </div>
+
+                                                <div className="space-y-4">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="h-3 w-3 rounded-full bg-orange-500" />
+                                                        <h4 className="font-medium text-sm">Needs Electric Burn</h4>
+                                                    </div>
+                                                    {needsBurn.length > 0 ? (
+                                                        <div className="space-y-2">
+                                                            {needsBurn.map((item: any, idx: number) => (
+                                                                <div key={idx} className="text-sm border p-2 rounded bg-orange-50/50 flex justify-between">
+                                                                    <span>{item.name}</span>
+                                                                    <span className="font-mono text-muted-foreground">{item.carats.toFixed(2)} ct</span>
+                                                                </div>
+                                                            ))}
+                                                            <div className="text-xs text-muted-foreground text-right border-t pt-2 mt-2">
+                                                                Total: {needsBurn.reduce((a: number, b: any) => a + b.carats, 0).toFixed(2)} ct
+                                                            </div>
+                                                        </div>
+                                                    ) : <div className="text-sm text-muted-foreground italic">No stones needing burn.</div>}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )
+                        }
                     }
                     return null
                 })()}

@@ -87,7 +87,8 @@ export async function transitionLotStage(
     lotId: string,
     nextStage: LotStage,
     data: any = {},
-    cost: number = 0
+    cost: number = 0,
+    transitionDate?: string
 ): Promise<TransitionResult> {
     // 0. CHECK: Admin Access
     const adminCheck = await requireAdmin()
@@ -131,6 +132,23 @@ export async function transitionLotStage(
     if (cost < 0) {
         return { success: false, error: 'Cost cannot be negative' }
     }
+
+    // 5.b Timestamp Generation (Unique)
+    // We merge the Manual Date (if provided) with the Current Time to ensure uniqueness
+    // and preserve ordering, avoiding 'unique_active_stage' violations.
+    let dateObj = new Date()
+    if (transitionDate) {
+        const manualDate = new Date(transitionDate)
+        // Keep the manual Year/Month/Day
+        dateObj.setFullYear(manualDate.getFullYear())
+        dateObj.setMonth(manualDate.getMonth())
+        dateObj.setDate(manualDate.getDate())
+        // Keep current Hours/Min/Sec (preserves entry order on that day)
+    }
+    // Add random jitter to ms to guarantee uniqueness even during rapid-fire testing
+    dateObj.setMilliseconds(Math.floor(Math.random() * 999))
+
+    const timestamp = dateObj.toISOString()
 
     // 6. PERFORM MUTATION (Pseudo-Transaction via Sequential Writes)
     // Note: Supabase doesn't support true transactions via Client unless using RPC.
@@ -200,7 +218,7 @@ export async function transitionLotStage(
                 .from('stage_logs')
                 .update({
                     data: mergedData,
-                    exited_at: targetLog.exited_at || new Date().toISOString() // Keep existing exit time if set, else close it
+                    exited_at: targetLog.exited_at || timestamp // Keep existing exit time if set, else close it
                 })
                 .eq('id', targetLog.id)
 
@@ -213,7 +231,7 @@ export async function transitionLotStage(
                 .from('lots')
                 .update({
                     is_finalized: true,
-                    updated_at: new Date().toISOString()
+                    updated_at: timestamp
                 })
                 .eq('id', lotId)
 
@@ -229,17 +247,15 @@ export async function transitionLotStage(
         // STANDARD TRANSITION (Move to next physical stage)
 
         // A. Close Previous Stage (Update Exited At)
-        // We update the stage_log for the current stage where exited_at is NULL
+        // We update ANY stage_log for this lot where exited_at is NULL.
+        // This is safer than matching 'stage' string which might have casing mismatches.
         const { error: closeError } = await supabase
             .from('stage_logs')
-            .update({ exited_at: new Date().toISOString() })
+            .update({ exited_at: timestamp })
             .eq('lot_id', lotId)
-            .eq('stage', currentStage)
             .is('exited_at', null)
 
         if (closeError) {
-            // If we fail here, it might be due to mismatched Enum values still?
-            // But we are using normalized 'currentStage'.
             console.error("Failed to close previous stage:", closeError)
             return { success: false, error: 'Failed to close previous stage' }
         }
@@ -251,7 +267,7 @@ export async function transitionLotStage(
                 lot_id: lotId,
                 stage: nextStage,
                 sequence_number: getStageSequence(nextStage),
-                entered_at: new Date().toISOString(),
+                entered_at: timestamp,
                 data: data,
                 metrics: data.metrics || {},
                 cost: cost,
@@ -269,7 +285,7 @@ export async function transitionLotStage(
         // C. Update Lot Identity
         const updatePayload: any = {
             current_stage: nextStage,
-            updated_at: new Date().toISOString()
+            updated_at: timestamp
         }
 
         // If transforming, update current weight if provided in data

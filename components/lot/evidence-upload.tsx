@@ -72,7 +72,7 @@ export function EvidenceUpload({ lotId, stage, isFinalized }: EvidenceUploadProp
 
     return (
         <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardHeader className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-2">
                 <CardTitle className="text-base font-semibold">Stage Evidence ({stage})</CardTitle>
                 {!isFinalized && (
                     <div className="flex items-center gap-2">

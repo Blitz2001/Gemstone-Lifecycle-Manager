@@ -64,6 +64,19 @@ export const ProcurementDataSchema = z.object({
   notes: z.string().optional()
 })
 
+// GAS BURN Data Schema (Mirrors Electric Burn)
+export const GasBurnDataSchema = z.object({
+  breakdown: z.array(z.object({
+    color: z.string().min(1, "Color is required"),
+    clarity: z.string().min(1, "Clarity is required"),
+    source_type: z.string().optional(),
+    pieces: z.coerce.number().min(0).optional(),
+    carats: z.coerce.number().positive("Weight must be positive"),
+  })).min(1, "At least one result must be recorded"),
+  notes: z.string().optional(),
+  new_weight: z.number().optional()
+})
+
 // ELECTRIC BURN Data Schema
 // Updated to track specific Color/Clarity/Weight breakdown for resulting stones
 export const ElectricBurnDataSchema = z.object({
@@ -75,6 +88,7 @@ export const ElectricBurnDataSchema = z.object({
     carats: z.coerce.number().positive("Weight must be positive"),
   })).min(1, "At least one result must be recorded"),
   notes: z.string().optional(),
+  new_weight: z.number().optional()
 })
 
 // SELL READY Data Schema
@@ -125,6 +139,9 @@ export function validateTransition(currentStage: LotStage, nextStage: LotStage):
  */
 export function validateStageData(stage: LotStage, data: any): { valid: boolean; error?: string } {
   try {
+    if (stage === LotStage.GAS_BURN) {
+      GasBurnDataSchema.parse(data);
+    }
     if (stage === LotStage.ELECTRIC_BURN) {
       ElectricBurnDataSchema.parse(data);
     }
@@ -137,7 +154,11 @@ export function validateStageData(stage: LotStage, data: any): { valid: boolean;
     return { valid: true };
   } catch (e: any) {
     if (e instanceof z.ZodError) {
-      return { valid: false, error: (e as any).errors.map((err: any) => `${err.path.join('.')}: ${err.message}`).join(', ') };
+      const errors = (e as any).errors || (e as any).errors; // Try both access patterns
+      if (Array.isArray(errors)) {
+        return { valid: false, error: errors.map((err: any) => `${err.path.join('.')}: ${err.message}`).join(', ') };
+      }
+      return { valid: false, error: e.message };
     }
     return { valid: false, error: e.message };
   }

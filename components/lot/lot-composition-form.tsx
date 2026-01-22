@@ -43,41 +43,50 @@ export function LotCompositionForm({ name }: { name: string }) {
     return (
         <div className="border rounded-md p-4 bg-muted/20">
             <h3 className="font-semibold mb-2">Rough Composition</h3>
-            <div className="grid grid-cols-12 gap-2 text-sm font-medium text-muted-foreground mb-2">
+            <div className="hidden md:grid grid-cols-12 gap-2 text-sm font-medium text-muted-foreground mb-2">
                 <div className="col-span-5">Type</div>
                 <div className="col-span-3 text-center">Pieces</div>
                 <div className="col-span-3 text-center">Carats</div>
                 <div className="col-span-1"></div>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-4 md:space-y-2">
                 {rows.map((row, index) => (
-                    <div key={index} className="grid grid-cols-12 gap-2 items-center">
-                        <div className="col-span-5">
+                    <div key={index} className="flex flex-col md:grid md:grid-cols-12 gap-2 items-start md:items-center p-3 md:p-0 border md:border-none rounded-lg bg-black/20 md:bg-transparent">
+                        <div className="w-full md:col-span-5">
+                            <label className="text-xs text-muted-foreground md:hidden mb-1 block">Type</label>
                             <Input
                                 placeholder="Gem Type"
                                 value={row.type}
                                 onChange={(e) => updateRow(index, 'type', e.target.value)}
                             />
                         </div>
-                        <Input
-                            type="number"
-                            min="0"
-                            className="col-span-3 h-10 text-center"
-                            placeholder="0"
-                            value={row.pieces || ''}
-                            onChange={(e) => updateRow(index, 'pieces', e.target.value)}
-                        />
-                        <Input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            className="col-span-3 h-10 text-center"
-                            placeholder="0.00"
-                            value={row.carats || ''}
-                            onChange={(e) => updateRow(index, 'carats', e.target.value)}
-                        />
-                        <div className="col-span-1 flex justify-center">
+                        <div className="flex w-full gap-2 md:contents">
+                            <div className="flex-1 md:col-span-3">
+                                <label className="text-xs text-muted-foreground md:hidden mb-1 block text-center">Pieces</label>
+                                <Input
+                                    type="number"
+                                    min="0"
+                                    className="h-10 text-center w-full"
+                                    placeholder="0"
+                                    value={row.pieces || ''}
+                                    onChange={(e) => updateRow(index, 'pieces', e.target.value)}
+                                />
+                            </div>
+                            <div className="flex-1 md:col-span-3">
+                                <label className="text-xs text-muted-foreground md:hidden mb-1 block text-center">Carats</label>
+                                <Input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    className="h-10 text-center w-full"
+                                    placeholder="0.00"
+                                    value={row.carats || ''}
+                                    onChange={(e) => updateRow(index, 'carats', e.target.value)}
+                                />
+                            </div>
+                        </div>
+                        <div className="w-full md:w-auto md:col-span-1 flex justify-end md:justify-center mt-2 md:mt-0">
                             <Button
                                 type="button"
                                 variant="ghost"
