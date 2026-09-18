@@ -6,9 +6,10 @@ interface StageTimelineProps {
     currentStage: string
     logs: any[]
     isFinalized?: boolean
+    purchaseDate?: string | null
 }
 
-export function StageTimeline({ currentStage, logs, isFinalized }: StageTimelineProps) {
+export function StageTimeline({ currentStage, logs, isFinalized, purchaseDate }: StageTimelineProps) {
     // Sort logic consistent with display (Newest First) for the timeline, 
     // BUT we need chronological (Oldest First) to calculate deltas.
     const chronologicalLogs = [...logs].sort((a, b) => new Date(a.entered_at).getTime() - new Date(b.entered_at).getTime())
@@ -88,7 +89,10 @@ export function StageTimeline({ currentStage, logs, isFinalized }: StageTimeline
                         <div className="flex flex-col gap-1">
                             <span className="text-sm font-medium leading-none text-muted-foreground">{getDisplayName(log.stage)}</span>
                             <span className="text-xs text-muted-foreground">
-                                Completed: {new Date(log.created_at || log.entered_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
+                                {(log.stage === 'PROCUREMENT' || log.stage === LotStage.PROCUREMENT) && purchaseDate
+                                    ? `Buying Date: ${new Date(purchaseDate).toLocaleDateString(undefined, { dateStyle: 'long' })}`
+                                    : `Completed: ${new Date(log.created_at || log.entered_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}`
+                                }
                             </span>
 
                             {/* Cost Display */}

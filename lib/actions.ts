@@ -746,3 +746,45 @@ export async function getDashboardMetrics() {
         pending_sales
     }
 }
+
+/**
+ * Permanently deletes a lot and all associated logs, costs, and assets.
+ * Requires Admin privileges.
+ */
+export async function deleteLot(lotId: string) {
+    // 0. CHECK: Admin Access
+    const adminCheck = await requireAdmin()
+    if (!adminCheck.success) {
+        return adminCheck
+    }
+
+    try {
+        const { createAdminClient } = await import('@/lib/supabase/admin')
+        const supabase = createAdminClient()
+
+        // 1. Delete associated lot assets
+        await supabase.from('lot_assets').delete().eq('lot_id', lotId)
+
+        // 2. Delete associated processing costs
+        await supabase.from('processing_costs').delete().eq('lot_id', lotId)
+
+        // 3. Delete associated stage logs
+        await supabase.from('stage_logs').delete().eq('lot_id', lotId)
+
+        // 4. Delete the lot record itself
+        const { error } = await supabase.from('lots').delete().eq('id', lotId)
+
+        if (error) {
+            console.error('Delete Lot Error:', error)
+            return { success: false, error: `Failed to delete lot: ${error.message}` }
+        }
+
+        revalidatePath('/')
+        revalidatePath('/dashboard')
+        return { success: true }
+    } catch (error: any) {
+        console.error('Delete Lot System Error:', error)
+        return { success: false, error: `System Error: ${error.message}` }
+    }
+}
+

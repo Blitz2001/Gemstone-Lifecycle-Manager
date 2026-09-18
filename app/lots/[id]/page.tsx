@@ -18,6 +18,8 @@ import { createStorageBucket } from '@/lib/setup-actions'
 import { PartialSalesManager } from '@/components/lot/partial-sales-manager'
 import { PartialSalesHistory } from '@/components/lot/partial-sales-history'
 import { getCurrentUserRole } from '@/lib/auth-utils'
+import { DeleteLotButton } from '@/components/lot/delete-lot-button'
+import { CertificationReport } from '@/components/lot/certification-report'
 
 export default async function LotPage({ params }: { params: Promise<{ id: string }> }) {
     const supabase = await createClient()
@@ -35,12 +37,11 @@ export default async function LotPage({ params }: { params: Promise<{ id: string
         .eq('id', id)
         .single()
 
-    if (lotError) {
+    if (lotError && lotError.code !== 'PGRST116') {
         console.error('Error fetching lot:', lotError);
     }
 
     if (!lot) {
-        console.log('Lot not found in DB. ID:', id);
         notFound()
     }
 
@@ -129,6 +130,7 @@ export default async function LotPage({ params }: { params: Promise<{ id: string
                             Print Report
                         </Button>
                     </Link>
+                    <DeleteLotButton lotId={lot.id} lotCode={lot.lot_code} isAdmin={isAdmin} />
                 </div>
             </div>
 
@@ -136,9 +138,21 @@ export default async function LotPage({ params }: { params: Promise<{ id: string
             <div className="flex flex-col md:flex-row justify-between items-start gap-4">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">{lot.lot_code}</h1>
-                    <p className="text-muted-foreground">
-                        Created on {new Date(lot.created_at).toLocaleDateString(undefined, { dateStyle: 'long' })}
-                    </p>
+                    <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mt-1">
+                        {lot.purchase_date ? (
+                            <span className="font-semibold text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded border border-emerald-500/20">
+                                Buying Date: {new Date(lot.purchase_date).toLocaleDateString(undefined, { dateStyle: 'long' })}
+                            </span>
+                        ) : (
+                            <span>Created on {new Date(lot.created_at).toLocaleDateString(undefined, { dateStyle: 'long' })}</span>
+                        )}
+                        {lot.supplier && (
+                            <>
+                                <span>•</span>
+                                <span>Supplier: <strong className="text-foreground">{lot.supplier}</strong></span>
+                            </>
+                        )}
+                    </div>
                 </div>
                 <div className="text-left md:text-right">
                     <div className="text-sm text-muted-foreground uppercase tracking-widest">Current Stage</div>
@@ -152,6 +166,28 @@ export default async function LotPage({ params }: { params: Promise<{ id: string
                     <div className="text-sm font-medium text-muted-foreground">
                         Total Cost: <span className="text-foreground font-bold">LKR {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
+                </div>
+            </div>
+
+            {/* Procurement Overview Metadata Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-muted/30 p-4 rounded-xl border">
+                <div>
+                    <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold block">Buying Date</span>
+                    <span className="font-bold text-sm text-foreground">
+                        {lot.purchase_date ? new Date(lot.purchase_date).toLocaleDateString(undefined, { dateStyle: 'medium' }) : 'Not Specified'}
+                    </span>
+                </div>
+                <div>
+                    <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold block">Supplier</span>
+                    <span className="font-bold text-sm text-foreground">{lot.supplier || 'N/A'}</span>
+                </div>
+                <div>
+                    <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold block">Purchase Price</span>
+                    <span className="font-bold text-sm text-foreground">LKR {(Number(lot.purchase_price) || 0).toLocaleString()}</span>
+                </div>
+                <div>
+                    <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold block">Initial Rough Weight</span>
+                    <span className="font-bold text-sm text-foreground">{lot.initial_weight || 0} ct</span>
                 </div>
             </div>
 
@@ -227,6 +263,19 @@ export default async function LotPage({ params }: { params: Promise<{ id: string
                                     currentComposition={currentComposition}
                                     currentStage={lot.current_stage}
                                 />
+                            </div>
+                        )
+                    }
+                    return null
+                })()}
+
+                {/* LOGIC: Find Certification Data for Report */}
+                {(() => {
+                    const certLog = logs?.find(l => (l.stage === 'CERTIFICATION' || l.stage === LotStage.CERTIFICATION) && l.data)
+                    if (certLog) {
+                        return (
+                            <div className="grid md:grid-cols-1 gap-4">
+                                <CertificationReport data={certLog.data} />
                             </div>
                         )
                     }
@@ -375,7 +424,7 @@ export default async function LotPage({ params }: { params: Promise<{ id: string
                 </div>
 
                 {/* Timeline */}
-                <StageTimeline currentStage={lot.current_stage} logs={logs || []} isFinalized={lot.is_finalized} />
+                <StageTimeline currentStage={lot.current_stage} logs={logs || []} isFinalized={lot.is_finalized} purchaseDate={lot.purchase_date} />
             </div>
         </div>
     )

@@ -1,0 +1,2 @@
+-- Add CERTIFICATION stage to lot_stage_enum
+ALTER TYPE lot_stage_enum ADD VALUE IF NOT EXISTS 'CERTIFICATION' BEFORE 'SELL_READY';

@@ -19,6 +19,7 @@ import { Card } from '@/components/ui/card'
 import { BreakdownForm } from './forms/breakdown-form'
 import { SellReadyForm } from './forms/sell-ready-form'
 import { SoldForm } from './forms/sold-form'
+import { CertificationForm } from './forms/certification-form'
 import { LockOpen, ShoppingCart } from 'lucide-react'
 
 interface TransitionControlsProps {
@@ -102,6 +103,9 @@ export function TransitionControls({ lotId, currentStage, isFinalized, compositi
     // State for Sold Data
     const [soldData, setSoldData] = useState<any>(null)
 
+    // State for Certification Data
+    const [certificationData, setCertificationData] = useState<any>(null)
+
     // Stable handler to prevent infinite loop in BreakdownForm effect
     const onBreakdownChange = useCallback((data: any) => {
         setBreakdownData(data)
@@ -113,6 +117,10 @@ export function TransitionControls({ lotId, currentStage, isFinalized, compositi
 
     const onSoldChange = useCallback((data: any) => {
         setSoldData(data)
+    }, [])
+
+    const onCertificationChange = useCallback((data: any) => {
+        setCertificationData(data)
     }, [])
 
     // Fix Hydration Error: Radix UI IDs mismatch on server/client.
@@ -130,12 +138,14 @@ export function TransitionControls({ lotId, currentStage, isFinalized, compositi
         setLoading(false)
     }
 
+    const [selectedTargetStage, setSelectedTargetStage] = useState<LotStage | null>(null)
+
     // Normalize Stage: Handle cases where DB has 'Sell Ready' (display name) or 'SELL_READY' (legacy)
     const workingStage = normalizeStage(currentStage) || currentStage
 
     // Determine possible next stages
-    const nextStages = ALLOWED_TRANSITIONS[workingStage]
-    const nextStage = nextStages?.[0]
+    const nextStages = ALLOWED_TRANSITIONS[workingStage] || []
+    const nextStage = (selectedTargetStage && nextStages.includes(selectedTargetStage)) ? selectedTargetStage : nextStages?.[0]
 
     // if (!mounted) return null // Removed to force visibility
 
@@ -185,6 +195,10 @@ export function TransitionControls({ lotId, currentStage, isFinalized, compositi
             // This prevents "consumed" stones from appearing as results or being carried over.
             const userEnteredRows = (breakdownData?.breakdown || [])
                 .filter((r: any) => (r.carats || 0) > 0)
+                .map((r: any) => ({
+                    ...r,
+                    clarity: (r.clarity && r.clarity.trim() !== '') ? r.clarity : '-'
+                }))
 
             // Note: We'll check if we have ANY data (user entered OR auto-carryover) after calculating auto-carryover.
 
@@ -195,14 +209,14 @@ export function TransitionControls({ lotId, currentStage, isFinalized, compositi
             const autoCarryOver: any[] = []
 
             Object.entries(composition || {}).forEach(([key, stats]) => {
-                if (!touchedKeys.has(key)) {
+                if (!touchedKeys.has(key) && ((stats.carats || 0) > 0 || (stats.pieces || 0) > 0)) {
                     // This stone type was ignored by the user -> assume it passes through unchanged.
                     autoCarryOver.push({
                         color: key,            // Maintain the full key name (e.g. "Royal Blue IF")
                         clarity: '-',          // Default clarity for source types
                         source_type: key,      // Track lineage
-                        pieces: stats.pieces,
-                        carats: stats.carats
+                        pieces: stats.pieces || 0,
+                        carats: stats.carats || 0
                     })
                 }
             })
@@ -223,6 +237,17 @@ export function TransitionControls({ lotId, currentStage, isFinalized, compositi
             data = breakdownData
             totalNewWeight = validRows.reduce((sum: number, r: any) => sum + r.carats, 0)
             data.new_weight = totalNewWeight
+        } else if (nextStage === LotStage.CERTIFICATION) {
+            // Validate Certification Data
+            if (!certificationData?.lab_name || !certificationData?.report_number) {
+                setError("Laboratory name and report number are required.")
+                setLoading(false)
+                return
+            }
+            data = certificationData
+            totalNewWeight = certificationData.verified_carat || Object.values(composition || {}).reduce((sum, s) => sum + s.carats, 0)
+            data.new_weight = totalNewWeight
+
         } else if (nextStage === LotStage.SELL_READY) {
             // Validate Sell Ready Data
             if (!sellReadyData?.valuations || sellReadyData.valuations.length === 0) {
@@ -328,6 +353,27 @@ export function TransitionControls({ lotId, currentStage, isFinalized, compositi
                         <div className="grid gap-4 py-4">
                             {error && <div className="text-red-500 text-sm">{error}</div>}
 
+                            {/* Target Stage Selection (If multiple options exist like Gas Burn -> Cut & Polish OR Electric Burn) */}
+                            {nextStages.length > 1 && (
+                                <div className="flex items-center gap-3 bg-muted p-3 rounded-lg border">
+                                    <Label className="font-semibold text-xs text-muted-foreground uppercase tracking-wider whitespace-nowrap">Target Stage:</Label>
+                                    <div className="flex gap-2">
+                                        {nextStages.map(stage => (
+                                            <Button
+                                                key={stage}
+                                                type="button"
+                                                size="sm"
+                                                variant={nextStage === stage ? "default" : "outline"}
+                                                onClick={() => setSelectedTargetStage(stage)}
+                                                className="text-xs"
+                                            >
+                                                {STAGE_DISPLAY_NAMES[stage]}
+                                            </Button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
                             {/* NEW: Date and Cost Inputs */}
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="grid grid-cols-4 items-center gap-4">
@@ -385,6 +431,10 @@ export function TransitionControls({ lotId, currentStage, isFinalized, compositi
                                 <BreakdownForm
                                     composition={composition}
                                     onChange={onBreakdownChange}
+                                />
+                            ) : nextStage === LotStage.CERTIFICATION ? (
+                                <CertificationForm
+                                    onChange={onCertificationChange}
                                 />
                             ) : nextStage === LotStage.SELL_READY ? (
                                 /* SELL READY: Valuation Form */

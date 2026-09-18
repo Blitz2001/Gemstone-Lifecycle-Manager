@@ -9,6 +9,7 @@ export enum LotStage {
   GAS_BURN = 'GAS_BURN',
   CUT_POLISH = 'CUT_POLISH',
   ELECTRIC_BURN = 'ELECTRIC_BURN',
+  CERTIFICATION = 'CERTIFICATION',
   SELL_READY = 'SELL_READY',
   SOLD = 'Sold' // Confirmed Title Case in DB
 }
@@ -19,8 +20,9 @@ export const STAGE_SEQUENCE: Record<LotStage, number> = {
   [LotStage.GAS_BURN]: 3,
   [LotStage.CUT_POLISH]: 4,
   [LotStage.ELECTRIC_BURN]: 5,
-  [LotStage.SELL_READY]: 6,
-  [LotStage.SOLD]: 7
+  [LotStage.CERTIFICATION]: 6,
+  [LotStage.SELL_READY]: 7,
+  [LotStage.SOLD]: 8
 };
 
 export const STAGE_DISPLAY_NAMES: Record<LotStage, string> = {
@@ -29,6 +31,7 @@ export const STAGE_DISPLAY_NAMES: Record<LotStage, string> = {
   [LotStage.GAS_BURN]: 'Gas Burn',
   [LotStage.CUT_POLISH]: 'Cut & Polish',
   [LotStage.ELECTRIC_BURN]: 'Electric Burn',
+  [LotStage.CERTIFICATION]: 'Lab Certification',
   [LotStage.SELL_READY]: 'Sell Ready',
   [LotStage.SOLD]: 'Sold'
 };
@@ -36,9 +39,10 @@ export const STAGE_DISPLAY_NAMES: Record<LotStage, string> = {
 export const ALLOWED_TRANSITIONS: Record<LotStage, LotStage[]> = {
   [LotStage.PROCUREMENT]: [LotStage.PERFORMING],
   [LotStage.PERFORMING]: [LotStage.GAS_BURN],
-  [LotStage.GAS_BURN]: [LotStage.CUT_POLISH],
-  [LotStage.CUT_POLISH]: [LotStage.ELECTRIC_BURN],
-  [LotStage.ELECTRIC_BURN]: [LotStage.SELL_READY],
+  [LotStage.GAS_BURN]: [LotStage.CUT_POLISH, LotStage.ELECTRIC_BURN],
+  [LotStage.CUT_POLISH]: [LotStage.ELECTRIC_BURN, LotStage.CERTIFICATION],
+  [LotStage.ELECTRIC_BURN]: [LotStage.CERTIFICATION, LotStage.SELL_READY],
+  [LotStage.CERTIFICATION]: [LotStage.SELL_READY],
   [LotStage.SELL_READY]: [LotStage.SOLD],
   [LotStage.SOLD]: [] // Terminal state
 };
@@ -68,10 +72,10 @@ export const ProcurementDataSchema = z.object({
 export const GasBurnDataSchema = z.object({
   breakdown: z.array(z.object({
     color: z.string().min(1, "Color is required"),
-    clarity: z.string().min(1, "Clarity is required"),
+    clarity: z.string().optional().default('-'),
     source_type: z.string().optional(),
     pieces: z.coerce.number().min(0).optional(),
-    carats: z.coerce.number().positive("Weight must be positive"),
+    carats: z.coerce.number().min(0, "Weight cannot be negative"),
   })).min(1, "At least one result must be recorded"),
   notes: z.string().optional(),
   new_weight: z.number().optional()
@@ -82,14 +86,28 @@ export const GasBurnDataSchema = z.object({
 export const ElectricBurnDataSchema = z.object({
   breakdown: z.array(z.object({
     color: z.string().min(1, "Color is required"),
-    clarity: z.string().min(1, "Clarity is required"), // e.g., 'VVS', 'VS', 'Cln', 'WCln'
+    clarity: z.string().optional().default('-'), // Default to '-' if unselected
     source_type: z.string().optional(), // New: Track which rough type this came from
     pieces: z.coerce.number().min(0).optional(),
-    carats: z.coerce.number().positive("Weight must be positive"),
+    carats: z.coerce.number().min(0, "Weight cannot be negative"),
   })).min(1, "At least one result must be recorded"),
   notes: z.string().optional(),
   new_weight: z.number().optional()
 })
+
+// CERTIFICATION Data Schema
+export const CertificationDataSchema = z.object({
+  lab_name: z.string().min(1, "Lab name is required"), // GIA, GRS, IGI, Lotus Gemology, SSEF, CGL, AIGS, EGL
+  report_number: z.string().min(1, "Report number is required"),
+  certificate_date: z.string().optional(),
+  verified_carat: z.coerce.number().positive("Carat weight must be positive").optional(),
+  color_grade: z.string().optional(),
+  clarity_grade: z.string().optional(),
+  cut_shape: z.string().optional(),
+  treatment_status: z.string().optional(),
+  report_url: z.string().optional(),
+  notes: z.string().optional()
+});
 
 // SELL READY Data Schema
 export const SellReadyDataSchema = z.object({
@@ -145,6 +163,9 @@ export function validateStageData(stage: LotStage, data: any): { valid: boolean;
     if (stage === LotStage.ELECTRIC_BURN) {
       ElectricBurnDataSchema.parse(data);
     }
+    if (stage === LotStage.CERTIFICATION) {
+      CertificationDataSchema.parse(data);
+    }
     if (stage === LotStage.SELL_READY) {
       SellReadyDataSchema.parse(data);
     }
@@ -192,6 +213,7 @@ export function normalizeStage(rawStage: string | null | undefined): LotStage | 
   if (upper === 'GAS_BURN' || upper === 'GAS BURN') return LotStage.GAS_BURN
   if (upper === 'CUT_POLISH' || upper === 'CUT & POLISH') return LotStage.CUT_POLISH
   if (upper === 'ELECTRIC_BURN' || upper === 'ELECTRIC BURN') return LotStage.ELECTRIC_BURN
+  if (upper === 'CERTIFICATION' || upper === 'LAB CERTIFICATION') return LotStage.CERTIFICATION
   if (upper === 'SELL_READY' || upper === 'SELL READY') return LotStage.SELL_READY
   if (upper === 'SOLD') return LotStage.SOLD // Enum is 'Sold', but comparisons often check SOLD
 

@@ -15,7 +15,13 @@
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.arunu.gemstoneroi",
+      "userInterfaceStyle": "dark",
+      "infoPlist": {
+        "NSCameraUsageDescription": "This app uses the camera to scan gem tray QR codes and capture gemstone certificates.",
+        "NSPhotoLibraryUsageDescription": "This app accesses your photos to upload gemstone certificates and photo evidence."
+      }
     },
     "android": {
       "adaptiveIcon": {

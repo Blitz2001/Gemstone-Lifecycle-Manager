@@ -75,7 +75,7 @@ export default async function LotReportPage({ params }: { params: Promise<{ id: 
                     <div>
                         <h1 className="text-4xl font-bold tracking-tight mb-2">{lot.lot_code}</h1>
                         <p className="text-sm text-gray-500">
-                            Created: {format(new Date(lot.created_at), 'PPP')}
+                            Buying Date: <strong className="text-gray-800">{lot.purchase_date ? format(new Date(lot.purchase_date), 'PPP') : 'N/A'}</strong> • Supplier: {lot.supplier || 'N/A'}
                         </p>
                     </div>
                     <div className="text-right">

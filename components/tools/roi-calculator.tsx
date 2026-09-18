@@ -131,29 +131,27 @@ export function RoiCalculator() {
                     {/* LEFT: INPUTS */}
                     <div className="space-y-4">
                         <div className="bg-white/5 border border-white/10 rounded-lg p-4 space-y-4">
-                            <h3 className="text-sm font-semibold text-blue-200 uppercase tracking-wider">1. Initial Investment</h3>
+                            <h3 className="text-sm font-semibold text-blue-200 uppercase tracking-wider">1. Initial Investment (LKR)</h3>
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <Label>Purchase Price</Label>
+                                    <Label>Purchase Price (LKR)</Label>
                                     <div className="relative">
-                                        <DollarSign className="absolute left-2 top-2.5 h-3 w-3 text-muted-foreground" />
                                         <Input
                                             type="number"
                                             placeholder="0.00"
-                                            className="pl-8 bg-black/20 border-white/10"
+                                            className="bg-black/20 border-white/10"
                                             value={purchasePrice}
                                             onChange={e => setPurchasePrice(e.target.value)}
                                         />
                                     </div>
                                 </div>
                                 <div className="space-y-2">
-                                    <Label>Process Budget</Label>
+                                    <Label>Process Budget (LKR)</Label>
                                     <div className="relative">
-                                        <DollarSign className="absolute left-2 top-2.5 h-3 w-3 text-muted-foreground" />
                                         <Input
                                             type="number"
                                             placeholder="e.g. Burn + Cut"
-                                            className="pl-8 bg-black/20 border-white/10"
+                                            className="bg-black/20 border-white/10"
                                             value={processingBudget}
                                             onChange={e => setProcessingBudget(e.target.value)}
                                         />
@@ -257,7 +255,7 @@ export function RoiCalculator() {
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <Label className="text-blue-300">Geuda Price ($/ct)</Label>
+                                    <Label className="text-blue-300">Geuda Price (LKR/ct)</Label>
                                     <Input
                                         type="number"
                                         className="bg-black/20 border-white/10"
@@ -267,7 +265,7 @@ export function RoiCalculator() {
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label className="text-orange-300">Other Price ($/ct)</Label>
+                                    <Label className="text-orange-300">Other Price (LKR/ct)</Label>
                                     <Input
                                         type="number"
                                         className="bg-black/20 border-white/10"
@@ -296,13 +294,13 @@ export function RoiCalculator() {
                             <div className="bg-white/5 border border-white/10 rounded-lg p-4">
                                 <div className="text-xs text-muted-foreground">Total Investment</div>
                                 <div className="text-xl font-bold font-mono mt-1 text-white">
-                                    {results.investment.toLocaleString()}
+                                    LKR {results.investment.toLocaleString()}
                                 </div>
                             </div>
                             <div className="bg-white/5 border border-white/10 rounded-lg p-4">
                                 <div className="text-xs text-muted-foreground">Est. Revenue</div>
                                 <div className="text-xl font-bold font-mono mt-1 text-green-400">
-                                    {results.revenue.toLocaleString()}
+                                    LKR {results.revenue.toLocaleString()}
                                 </div>
                             </div>
                         </div>
@@ -314,7 +312,7 @@ export function RoiCalculator() {
                                 <div className="flex justify-between items-center text-sm">
                                     <span>Net Profit / (Loss)</span>
                                     <span className={cn("font-mono font-bold", results.profit >= 0 ? "text-green-400" : "text-red-400")}>
-                                        {results.profit > 0 ? "+" : ""}{results.profit.toLocaleString()}
+                                        {results.profit > 0 ? "+" : ""}LKR {results.profit.toLocaleString()}
                                     </span>
                                 </div>
                             </div>
@@ -323,7 +321,7 @@ export function RoiCalculator() {
                                 <span className="font-semibold block mb-1">Break-even Price (Geuda):</span>
                                 To avoid loss, you must sell your Geuda stones for at least
                                 <span className="font-bold font-mono text-white ml-1">
-                                    {results.breakEvenGeuda > 0 ? results.breakEvenGeuda.toFixed(0) : 0} /ct
+                                    LKR {results.breakEvenGeuda > 0 ? results.breakEvenGeuda.toLocaleString(undefined, { maximumFractionDigits: 0 }) : 0} /ct
                                 </span>
                                 <br />(Assuming 'Other' stones sell at estimated price).
                             </div>

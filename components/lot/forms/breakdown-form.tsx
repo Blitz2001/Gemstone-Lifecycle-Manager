@@ -42,7 +42,7 @@ const CLARITIES = [
 export function BreakdownForm({ composition, onChange }: BreakdownFormProps) {
     // State for Transformed Stones (Color Changed)
     const [transformedRows, setTransformedRows] = useState<BreakdownItem[]>([
-        { id: 't1', color: '', clarity: '', pieces: 0, carats: 0 }
+        { id: 't1', color: '', clarity: '-', pieces: 0, carats: 0 }
     ])
 
     // State for Remainder Stones (Source Type Retained)
@@ -72,10 +72,14 @@ export function BreakdownForm({ composition, onChange }: BreakdownFormProps) {
         // Let's just strip IDs and send everything like before.
 
         const allData = [
-            ...transformedRows.map(({ id, ...rest }) => rest),
+            ...transformedRows.map(({ id, ...rest }) => ({
+                ...rest,
+                clarity: rest.clarity || '-'
+            })),
             ...remainderRows.map(({ id, ...rest }) => ({
                 ...rest,
-                color: rest.source_type || '' // Map source_type to color for backend
+                color: rest.source_type || '', // Map source_type to color for backend
+                clarity: rest.clarity || '-'
             }))
         ]
 
@@ -86,7 +90,7 @@ export function BreakdownForm({ composition, onChange }: BreakdownFormProps) {
     const addTransformedRow = () => {
         setTransformedRows(prev => [
             ...prev,
-            { id: Math.random().toString(36).substring(7), color: '', clarity: '', pieces: 0, carats: 0 }
+            { id: Math.random().toString(36).substring(7), color: '', clarity: '-', pieces: 0, carats: 0 }
         ])
     }
     const removeTransformedRow = (id: string) => {
@@ -94,7 +98,7 @@ export function BreakdownForm({ composition, onChange }: BreakdownFormProps) {
             setTransformedRows(prev => prev.filter(r => r.id !== id))
         } else {
             // Reset if last one
-            setTransformedRows([{ id: Math.random().toString(36).substring(7), color: '', clarity: '', pieces: 0, carats: 0 }])
+            setTransformedRows([{ id: Math.random().toString(36).substring(7), color: '', clarity: '-', pieces: 0, carats: 0 }])
         }
     }
     const updateTransformedRow = (id: string, field: keyof BreakdownItem, value: any) => {
