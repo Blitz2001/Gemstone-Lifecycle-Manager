@@ -240,7 +240,7 @@ export async function transitionLotStage(
             }
 
             revalidatePath(`/lots/${lotId}`)
-            revalidatePath('/dashboard')
+            revalidatePath('/')
             return { success: true }
         }
 
@@ -305,7 +305,7 @@ export async function transitionLotStage(
         }
 
         revalidatePath(`/lots/${lotId}`)
-        revalidatePath('/dashboard')
+        revalidatePath('/')
 
         return { success: true }
 
@@ -342,6 +342,7 @@ export async function reopenLot(lotId: string) {
     if (error) return { success: false, error: error.message }
 
     revalidatePath(`/lots/${lotId}`)
+    revalidatePath('/')
     return { success: true }
 }
 
@@ -808,7 +809,6 @@ export async function deleteLot(lotId: string) {
         }
 
         revalidatePath('/')
-        revalidatePath('/dashboard')
         return { success: true }
     } catch (error: any) {
         console.error('Delete Lot System Error:', error)

@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { revalidatePath } from 'next/cache'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -61,6 +62,7 @@ export default async function NewLotPage() {
             console.error(logError)
         }
 
+        revalidatePath('/')
         redirect(`/lots/${lot.id}`)
     }
 
