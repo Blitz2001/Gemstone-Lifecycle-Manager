@@ -5,10 +5,10 @@ import { login } from '@/lib/actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card'
-import { Loader2, AlertCircle } from 'lucide-react'
+import { Loader2, AlertCircle, ShieldCheck, Lock, Mail } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 
 export default function LoginPage() {
@@ -20,16 +20,8 @@ export default function LoginPage() {
         setLoading(true)
         setError(null)
 
-        // Server action handled here directly via form action would be nicer for progressive enhancement,
-        // but we want to catch errors easily on client side for this demo or use useFormState.
-        // For simplicity with the existing pattern, let's wrap the action.
-
         try {
             const result = await login(formData)
-            if (result?.error) {
-                setError(result.error)
-                setLoading(false)
-            }
             if (result?.error) {
                 setError(result.error)
                 setLoading(false)
@@ -37,83 +29,119 @@ export default function LoginPage() {
                 router.push('/')
             }
         } catch (e) {
-            setError('An unexpected error occurred')
+            setError('An unexpected error occurred. Please try again.')
             setLoading(false)
         }
     }
 
     return (
-        <div className="flex h-screen w-full items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
-            <Card className="w-full max-w-sm">
-                <CardHeader className="text-center">
-                    <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-                        <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            className="h-6 w-6 text-primary"
-                        >
-                            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-                            <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
-                            <line x1="12" y1="22.08" x2="12" y2="12" />
-                        </svg>
-                    </div>
-                    <CardTitle className="text-2xl">Welcome back</CardTitle>
-                    <CardDescription>
-                        Enter your credentials to access the system
-                    </CardDescription>
-                </CardHeader>
-                <form action={handleSubmit}>
-                    <CardContent className="grid gap-4">
+        <div className="min-h-screen w-full flex items-center justify-center bg-[#070a12] text-slate-100 px-4 relative overflow-hidden selection:bg-blue-600/30 selection:text-blue-200">
+            {/* Ambient Background Glows */}
+            <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-blue-600/10 rounded-full blur-[120px] pointer-events-none" />
+            <div className="absolute bottom-10 right-10 w-72 h-72 bg-emerald-600/5 rounded-full blur-[100px] pointer-events-none" />
 
+            <div className="w-full max-w-md relative z-10">
+                {/* Brand Emblem */}
+                <div className="text-center mb-8">
+                    <div className="inline-flex relative w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-950/60 to-slate-900 border border-blue-500/30 items-center justify-center p-2.5 shadow-[0_0_25px_rgba(37,99,235,0.25)] mb-4">
+                        <Image
+                            src="/logo.png"
+                            alt="Gemstone Vault Logo"
+                            width={52}
+                            height={52}
+                            className="object-contain"
+                            priority
+                        />
+                    </div>
+                    <div className="text-[10px] font-mono uppercase tracking-[0.25em] text-blue-400 font-bold mb-1">
+                        Private Concession Custody
+                    </div>
+                    <h1 className="text-3xl font-bold font-serif text-white tracking-tight">
+                        Vault Access
+                    </h1>
+                    <p className="text-xs text-slate-400 mt-1 font-sans">
+                        Authenticate to access the production floor &amp; audit ledger
+                    </p>
+                </div>
+
+                {/* Form Card */}
+                <div className="obsidian-card rounded-2xl p-7 sm:p-8 border border-white/5 relative overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
+                    <form action={handleSubmit} className="space-y-5">
                         {error && (
-                            <Alert variant="destructive">
-                                <AlertCircle className="h-4 w-4" />
-                                <AlertTitle>Error</AlertTitle>
-                                <AlertDescription>{error}</AlertDescription>
-                            </Alert>
+                            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-start gap-2.5">
+                                <AlertCircle className="h-4 w-4 text-rose-400 shrink-0 mt-0.5" />
+                                <div>
+                                    <span className="font-semibold block font-serif">Authentication Failed</span>
+                                    <span className="text-[11px] text-rose-300/80">{error}</span>
+                                </div>
+                            </div>
                         )}
 
-                        <div className="grid gap-2">
-                            <Label htmlFor="email">Email</Label>
+                        <div className="space-y-1.5">
+                            <Label htmlFor="email" className="text-xs font-semibold uppercase tracking-wider text-slate-300 font-mono flex items-center gap-1.5">
+                                <Mail className="w-3 h-3 text-blue-400" />
+                                Vault Identity (Email)
+                            </Label>
                             <Input
                                 id="email"
                                 name="email"
                                 type="email"
-                                placeholder="name@example.com"
+                                placeholder="gemologist@vault.com"
                                 required
                                 autoComplete="email"
+                                className="bg-slate-900/60 border-white/10 text-sm text-white placeholder:text-slate-600 focus:border-blue-500/50 rounded-xl h-11"
                             />
                         </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="password">Password</Label>
+
+                        <div className="space-y-1.5">
+                            <Label htmlFor="password" className="text-xs font-semibold uppercase tracking-wider text-slate-300 font-mono flex items-center gap-1.5">
+                                <Lock className="w-3 h-3 text-blue-400" />
+                                Access Key (Password)
+                            </Label>
                             <Input
                                 id="password"
                                 name="password"
                                 type="password"
+                                placeholder="••••••••••••"
                                 required
                                 autoComplete="current-password"
+                                className="bg-slate-900/60 border-white/10 text-sm text-white placeholder:text-slate-600 focus:border-blue-500/50 rounded-xl h-11"
                             />
                         </div>
-                    </CardContent>
-                    <CardFooter className="flex flex-col gap-4">
-                        <Button className="w-full" type="submit" disabled={loading}>
-                            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                            Sign in
+
+                        <Button 
+                            type="submit" 
+                            disabled={loading} 
+                            className="w-full h-11 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:to-indigo-500 text-white font-medium text-xs rounded-xl shadow-[0_0_20px_rgba(37,99,235,0.3)] border border-blue-400/30 transition-all flex items-center justify-center gap-2 mt-2"
+                        >
+                            {loading ? (
+                                <>
+                                    <Loader2 className="h-4 w-4 animate-spin text-blue-200" />
+                                    <span className="font-mono text-xs tracking-wider">VERIFYING SIGNATURE...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <ShieldCheck className="h-4 w-4 text-blue-200" />
+                                    <span>Enter Production Floor</span>
+                                </>
+                            )}
                         </Button>
-                        <div className="text-center text-sm text-muted-foreground mt-2">
-                            Don&apos;t have an account?{' '}
-                            <Link href="/signup" className="underline underline-offset-4 hover:text-primary">
-                                Sign up
+
+                        <div className="pt-3 border-t border-white/5 text-center text-xs text-slate-400">
+                            Need credentials?{' '}
+                            <Link href="/signup" className="text-blue-400 hover:text-blue-300 font-medium underline underline-offset-4">
+                                Request Vault Account
                             </Link>
                         </div>
-                    </CardFooter>
-                </form>
-            </Card>
+                    </form>
+                </div>
+
+                {/* Footer Security Badge */}
+                <div className="mt-8 text-center text-[10px] text-slate-500 font-mono flex items-center justify-center gap-2">
+                    <ShieldCheck className="w-3 h-3 text-slate-600" />
+                    <span>ENC-256 VAULT PROTOCOL • RATNAPURA ASSAY OFFICE</span>
+                </div>
+            </div>
         </div>
     )
 }

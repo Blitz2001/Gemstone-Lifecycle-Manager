@@ -2,15 +2,15 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Gem } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { LotStage } from '@/lib/state-machine'
 import { requireAdmin } from '@/lib/auth-utils'
 import { LotCompositionForm } from '@/components/lot/lot-composition-form'
 import { ProcurementImagePicker } from '@/components/lot/procurement-image-picker'
 import { CreateLotSubmitButton } from '@/components/lot/create-lot-submit-button'
+import { VaultShell } from '@/components/layout/vault-shell'
 
 export default async function NewLotPage() {
     // 0. Page-level Admin Guard
@@ -47,7 +47,7 @@ export default async function NewLotPage() {
             rough_composition = {}
         }
 
-        // 1. Create Lot
+        // 1. Create Lot in database
         const { data: lot, error: lotError } = await supabase
             .from('lots')
             .insert({
@@ -128,63 +128,140 @@ export default async function NewLotPage() {
     }
 
     return (
-        <div className="container mx-auto py-8 max-w-2xl">
-            <Link href="/" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-4">
-                <ArrowLeft className="h-4 w-4" />
-                Back to Dashboard
-            </Link>
+        <VaultShell>
+            <div className="p-4 sm:p-6 lg:p-8 max-w-2xl mx-auto w-full space-y-5">
+                {/* Back to Dashboard link */}
+                <div>
+                    <Link 
+                        href="/" 
+                        className="inline-flex items-center gap-1.5 text-xs font-mono text-slate-400 hover:text-amber-300 transition-colors"
+                    >
+                        <ArrowLeft className="h-3.5 w-3.5" />
+                        Back to Dashboard
+                    </Link>
+                </div>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>Register New Lot (Procurement)</CardTitle>
-                    <CardDescription>
-                        Create an official gemstone lot record, rough composition breakdown, and initial photographic evidence.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <form action={createLot} className="space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="grid gap-2">
-                                <Label htmlFor="lot_code">Lot Code</Label>
-                                <Input id="lot_code" name="lot_code" placeholder="LT-2026-XXX" required />
+                {/* Main Luxury Intake Card */}
+                <div className="obsidian-card rounded-2xl p-6 sm:p-8 border border-white/5 shadow-2xl relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
+
+                    {/* Card Header */}
+                    <div className="mb-6 pb-4 border-b border-white/5 flex items-center justify-between">
+                        <div>
+                            <div className="flex items-center gap-2 mb-1">
+                                <div className="w-7 h-7 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                                    <Gem className="w-3.5 h-3.5" />
+                                </div>
+                                <h1 className="text-xl sm:text-2xl font-bold font-serif text-white tracking-tight">
+                                    Register New Lot
+                                </h1>
+                            </div>
+                            <p className="text-xs text-slate-400 font-sans">
+                                Intake procurement record, rough composition breakdown, and photographic evidence.
+                            </p>
+                        </div>
+                        <span className="text-[10px] font-mono font-bold px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20 uppercase">
+                            Stage: Procurement
+                        </span>
+                    </div>
+
+                    <form action={createLot} className="space-y-5">
+                        {/* Row 1: Lot Code & Supplier */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                                <Label htmlFor="lot_code" className="text-xs font-mono uppercase text-slate-300">
+                                    Lot Code
+                                </Label>
+                                <Input 
+                                    id="lot_code" 
+                                    name="lot_code" 
+                                    placeholder="e.g. LT-2026-001" 
+                                    required 
+                                    className="bg-slate-900/60 border-white/10 text-sm font-mono text-white focus:border-amber-500/50 rounded-xl h-10"
+                                />
                             </div>
 
-                            <div className="grid gap-2">
-                                <Label htmlFor="supplier">Supplier</Label>
-                                <Input id="supplier" name="supplier" placeholder="Supplier Name" required />
+                            <div className="space-y-1.5">
+                                <Label htmlFor="supplier" className="text-xs font-mono uppercase text-slate-300">
+                                    Supplier / Source
+                                </Label>
+                                <Input 
+                                    id="supplier" 
+                                    name="supplier" 
+                                    placeholder="Supplier Name or Concession" 
+                                    required 
+                                    className="bg-slate-900/60 border-white/10 text-sm text-white focus:border-amber-500/50 rounded-xl h-10"
+                                />
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="grid gap-2">
-                                <Label htmlFor="purchase_price">Purchase Price (LKR)</Label>
-                                <Input id="purchase_price" name="purchase_price" type="number" min="0" step="0.01" placeholder="0.00" required />
+                        {/* Row 2: Purchase Price & Buying Date */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                                <Label htmlFor="purchase_price" className="text-xs font-mono uppercase text-slate-300">
+                                    Purchase Price (LKR)
+                                </Label>
+                                <Input 
+                                    id="purchase_price" 
+                                    name="purchase_price" 
+                                    type="number" 
+                                    min="0" 
+                                    step="0.01" 
+                                    placeholder="0.00" 
+                                    required 
+                                    className="bg-slate-900/60 border-white/10 text-sm font-mono text-white focus:border-amber-500/50 rounded-xl h-10"
+                                />
                             </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="purchase_date">Buying Date</Label>
-                                <Input id="purchase_date" name="purchase_date" type="date" required />
+
+                            <div className="space-y-1.5">
+                                <Label htmlFor="purchase_date" className="text-xs font-mono uppercase text-slate-300">
+                                    Buying Date
+                                </Label>
+                                <Input 
+                                    id="purchase_date" 
+                                    name="purchase_date" 
+                                    type="date" 
+                                    defaultValue={new Date().toISOString().split('T')[0]}
+                                    required 
+                                    className="bg-slate-900/60 border-white/10 text-sm text-white focus:border-amber-500/50 rounded-xl h-10"
+                                />
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 gap-4">
-                            <div className="grid gap-2">
-                                <Label htmlFor="initial_weight">Initial Weight (Carats)</Label>
-                                <Input id="initial_weight" name="initial_weight" type="number" min="0" step="0.01" placeholder="0.00" required />
-                            </div>
+                        {/* Row 3: Initial Weight */}
+                        <div className="space-y-1.5">
+                            <Label htmlFor="initial_weight" className="text-xs font-mono uppercase text-slate-300">
+                                Initial Weight (Carats)
+                            </Label>
+                            <Input 
+                                id="initial_weight" 
+                                name="initial_weight" 
+                                type="number" 
+                                min="0" 
+                                step="0.01" 
+                                placeholder="0.00" 
+                                required 
+                                className="bg-slate-900/60 border-white/10 text-sm font-mono text-white focus:border-amber-500/50 rounded-xl h-10"
+                            />
                         </div>
 
                         {/* Optional Rough Evidence Photo Upload */}
-                        <ProcurementImagePicker name="rough_image" />
+                        <div className="pt-1">
+                            <ProcurementImagePicker name="rough_image" />
+                        </div>
 
-                        {/* Rough Composition */}
-                        <LotCompositionForm name="rough_composition" />
+                        {/* Rough Composition Breakdown */}
+                        <div className="pt-1">
+                            <LotCompositionForm name="rough_composition" />
+                        </div>
 
-                        <div className="pt-2">
+                        {/* Submit Button */}
+                        <div className="pt-3">
                             <CreateLotSubmitButton />
                         </div>
                     </form>
-                </CardContent>
-            </Card>
-        </div>
+                </div>
+            </div>
+        </VaultShell>
     )
 }

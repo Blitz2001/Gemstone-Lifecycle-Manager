@@ -1,13 +1,23 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
+import Image from 'next/image'
 import { format } from 'date-fns'
-import { Separator } from '@/components/ui/separator'
 import { ReportControls } from '@/components/lot/report-controls'
 import { LotStage, STAGE_DISPLAY_NAMES } from '@/lib/state-machine'
+import { VaultShell } from '@/components/layout/vault-shell'
+import { 
+    Scale, 
+    DollarSign, 
+    Calendar, 
+    Gem, 
+    Award,
+    Camera,
+    CheckCircle2 
+} from 'lucide-react'
 
 // Helper for currency
 const formatCurrency = (val: number) => {
-    return val.toLocaleString('en-LK', { style: 'currency', currency: 'LKR', minimumFractionDigits: 2 })
+    return `LKR ${(val || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
 }
 
 export default async function LotReportPage({ params }: { params: Promise<{ id: string }> }) {
@@ -32,7 +42,7 @@ export default async function LotReportPage({ params }: { params: Promise<{ id: 
         .eq('lot_id', id)
         .order('created_at', { ascending: true })
 
-    // Derived Financial Data
+    // Derived Financial Data from Database
     const buyingPrice = Number(lot.purchase_price) || 0
     const totalProcessingCost = logs?.reduce((sum, l) => sum + (Number(l.cost) || 0), 0) || 0
     const totalInvestment = buyingPrice + totalProcessingCost
@@ -41,310 +51,363 @@ export default async function LotReportPage({ params }: { params: Promise<{ id: 
     const soldLog = logs?.find(l => l.stage === 'SOLD' || l.stage === LotStage.SOLD)
     const certLog = logs?.find(l => l.stage === 'CERTIFICATION' || l.stage === LotStage.CERTIFICATION)
 
-    // Valuations & Sales
-    const valuations = sellReadyLog?.data?.valuations || []
+    // Valuations & Sales from Real Data
+    const valuations: any[] = sellReadyLog?.data?.valuations || []
     const salesHistory: any[] = sellReadyLog?.data?.sales_history || []
     const valuationTotal = valuations.reduce((sum: number, v: any) => sum + (Number(v.total_val) || 0), 0)
 
     const partialSalesTotal = salesHistory.reduce((sum: number, s: any) => sum + (Number(s.price) || 0), 0)
     const finalSalePrice = Number(sellReadyLog?.data?.sold_price || soldLog?.data?.sold_price || 0)
     const totalRealizedRevenue = finalSalePrice > 0 ? finalSalePrice : partialSalesTotal
-
-    // Profit Calculations
     const realizedProfit = totalRealizedRevenue > 0 ? totalRealizedRevenue - totalInvestment : 0
-    const projectedProfit = valuationTotal > 0 ? (totalRealizedRevenue + valuationTotal) - totalInvestment : 0
 
-    // Helper to extract weight at a given stage log
-    const getStageWeight = (log: any): number | null => {
-        if (log.stage === 'PROCUREMENT' || log.stage === LotStage.PROCUREMENT) return lot.initial_weight
-
-        if ((log.stage === 'GAS_BURN' || log.stage === LotStage.GAS_BURN) && log.data?.breakdown) {
-            return log.data.breakdown.reduce((sum: number, item: any) => sum + (Number(item.carats) || 0), 0)
-        }
-
-        if ((log.stage === 'ELECTRIC_BURN' || log.stage === LotStage.ELECTRIC_BURN) && log.data?.breakdown) {
-            return log.data.breakdown.reduce((sum: number, item: any) => sum + (Number(item.carats) || 0), 0)
-        }
-
-        if (log.stage === 'CERTIFICATION' || log.stage === LotStage.CERTIFICATION) {
-            if (log.data?.verified_carat) return Number(log.data.verified_carat)
-        }
-
-        if (log.stage === 'SELL_READY' || log.stage === LotStage.SELL_READY) {
-            if (log.data?.valuations && log.data.valuations.length > 0) {
-                return log.data.valuations.reduce((sum: number, v: any) => sum + (Number(v.carats) || 0), 0)
-            }
-            if (log.data?.new_weight) return Number(log.data.new_weight)
-        }
-
-        if (log.data?.new_weight) return Number(log.data.new_weight)
-
-        if (log.data?.measurements) {
-            const values = Object.values(log.data.measurements) as any[]
-            const sum = values.reduce((s, v) => s + (Number(v.carats) || 0), 0)
-            if (sum > 0) return sum
-        }
-        return null
-    }
-
-    const currentStageName = (lot.current_stage === 'SELL_READY' && lot.is_finalized)
-        ? 'Sold'
-        : (STAGE_DISPLAY_NAMES[lot.current_stage as LotStage] || lot.current_stage)
+    const initialWeight = Number(lot.initial_weight) || 0
+    const currentWeight = Number(lot.current_weight) || initialWeight
+    const recoveryRate = initialWeight > 0 ? ((currentWeight / initialWeight) * 100).toFixed(1) : '100.0'
+    const kerfLoss = initialWeight > 0 ? (initialWeight - currentWeight).toFixed(2) : '0.00'
+    const kerfLossPct = (100 - Number(recoveryRate)).toFixed(1)
 
     return (
-        <div className="container mx-auto py-8 max-w-4xl bg-white text-black min-h-screen">
-            {/* Print Control (Hidden when printing) */}
-            <ReportControls lotId={id} />
+        <VaultShell>
+            <div className="p-4 sm:p-6 lg:p-8 max-w-[1400px] mx-auto w-full">
+                {/* 1. Print & Navigation Controls */}
+                <ReportControls lotId={id} />
 
-            {/* HEADER */}
-            <div className="mb-6 border-b pb-4">
-                <div className="flex justify-between items-end">
-                    <div>
-                        <h1 className="text-4xl font-bold tracking-tight mb-2">{lot.lot_code}</h1>
-                        <p className="text-sm text-gray-500">
-                            Buying Date: <strong className="text-gray-800">{lot.purchase_date ? format(new Date(lot.purchase_date), 'PPP') : 'N/A'}</strong> • Supplier: {lot.supplier || 'N/A'}
-                        </p>
-                    </div>
-                    <div className="text-right">
-                        <div className="text-sm uppercase tracking-wider text-gray-500">Current Stage</div>
-                        <div className="text-xl font-bold">{currentStageName}</div>
-                        {lot.is_finalized && <span className="text-xs border px-2 py-0.5 rounded bg-gray-100 font-semibold">FINALIZED / SOLD</span>}
-                    </div>
-                </div>
-            </div>
-
-            {/* SPECS GRID */}
-            <div className="grid grid-cols-4 gap-4 mb-8">
-                <div className="border p-3 rounded">
-                    <div className="text-xs uppercase text-gray-500 font-semibold">Buying Price</div>
-                    <div className="font-mono text-lg">{formatCurrency(buyingPrice)}</div>
-                </div>
-                <div className="border p-3 rounded">
-                    <div className="text-xs uppercase text-gray-500 font-semibold">Total Investment</div>
-                    <div className="font-mono text-lg">{formatCurrency(totalInvestment)}</div>
-                    <div className="text-[10px] text-gray-400">purchase + processing</div>
-                </div>
-                <div className="border p-3 rounded bg-blue-50">
-                    <div className="text-xs uppercase text-blue-800 font-semibold">Projected Profit</div>
-                    <div className="font-mono text-lg font-bold text-blue-700">
-                        {valuationTotal > 0 ? formatCurrency(projectedProfit) : '-'}
-                    </div>
-                    <div className="text-[10px] text-blue-400">based on active valuation</div>
-                </div>
-                <div className="border p-3 rounded bg-green-50">
-                    <div className="text-xs uppercase text-green-800 font-semibold">Realized Revenue</div>
-                    <div className="font-mono text-lg font-bold text-green-700">
-                        {totalRealizedRevenue > 0 ? formatCurrency(totalRealizedRevenue) : '-'}
-                    </div>
-                    {totalRealizedRevenue > 0 && (
-                        <div className={`text-[11px] font-semibold ${realizedProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            Net: {formatCurrency(realizedProfit)}
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {/* TIMELINE */}
-            <div className="mb-8">
-                <h3 className="text-lg font-bold mb-3 border-b flex items-center">
-                    Production Timeline & Weight Tracking
-                </h3>
-                <div className="space-y-0">
-                    {/* Header Row */}
-                    <div className="grid grid-cols-12 py-2 border-b text-xs font-bold uppercase text-gray-500">
-                        <div className="col-span-2">Date</div>
-                        <div className="col-span-3">Stage</div>
-                        <div className="col-span-2 text-right pr-4">Weight</div>
-                        <div className="col-span-3">Details / Yield</div>
-                        <div className="col-span-2 text-right">Cost Added</div>
-                    </div>
-
-                    {logs?.map((log) => {
-                        const weight = getStageWeight(log)
-                        const stageLabel = STAGE_DISPLAY_NAMES[log.stage as LotStage] || log.stage
-                        return (
-                            <div key={log.id} className="grid grid-cols-12 py-3 border-b text-sm items-start">
-                                <div className="col-span-2 font-semibold text-gray-600">
-                                    {format(new Date(log.entered_at), 'MMM dd, yyyy')}
-                                </div>
-                                <div className="col-span-3 font-bold">
-                                    {stageLabel}
-                                </div>
-                                <div className="col-span-2 text-right font-mono pr-4">
-                                    {weight ? `${weight.toFixed(2)} cts` : '-'}
-                                </div>
-                                <div className="col-span-3 text-gray-600 text-xs">
-                                    {log.stage === 'GAS_BURN' && log.data?.breakdown && (
-                                        <span>{log.data.breakdown.length} stone groups cataloged</span>
-                                    )}
-                                    {log.stage === 'ELECTRIC_BURN' && log.data?.breakdown && (
-                                        <span>{log.data.breakdown.length} items transformed</span>
-                                    )}
-                                    {log.stage === 'CERTIFICATION' && log.data?.lab_name && (
-                                        <span className="font-medium text-amber-700">{log.data.lab_name} (#{log.data.report_number})</span>
-                                    )}
-                                    {log.stage === 'SELL_READY' && log.data?.valuations && (
-                                        <span>{log.data.valuations.length} valuation items listed</span>
-                                    )}
-                                    {log.data?.buyer && (
-                                        <span>Sold to {log.data.buyer}</span>
-                                    )}
-                                </div>
-                                <div className="col-span-2 text-right font-mono text-gray-500">
-                                    {Number(log.cost) > 0 ? formatCurrency(Number(log.cost)) : '-'}
-                                </div>
-                            </div>
-                        )
-                    })}
-                </div>
-            </div>
-
-            {/* LAB CERTIFICATION REPORT CARD (IF CERTIFIED) */}
-            {certLog && certLog.data && (
-                <div className="mb-8 p-4 border rounded-lg bg-amber-50/40 avoid-break">
-                    <h3 className="text-lg font-bold mb-2 text-amber-900 flex items-center gap-2">
-                        📜 Gemological Laboratory Certification
-                    </h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mt-3">
-                        <div>
-                            <span className="text-xs text-gray-500 uppercase block font-semibold">Laboratory</span>
-                            <span className="font-bold text-gray-900">{certLog.data.lab_name || 'N/A'}</span>
-                        </div>
-                        <div>
-                            <span className="text-xs text-gray-500 uppercase block font-semibold">Report Number</span>
-                            <span className="font-mono font-bold text-gray-900">{certLog.data.report_number || 'N/A'}</span>
-                        </div>
-                        <div>
-                            <span className="text-xs text-gray-500 uppercase block font-semibold">Verified Weight</span>
-                            <span className="font-bold text-gray-900">{certLog.data.verified_carat ? `${Number(certLog.data.verified_carat).toFixed(2)} ct` : 'N/A'}</span>
-                        </div>
-                        <div>
-                            <span className="text-xs text-gray-500 uppercase block font-semibold">Color & Clarity</span>
-                            <span className="font-bold text-gray-900">{certLog.data.color_grade || '-'} • {certLog.data.clarity_grade || '-'}</span>
-                        </div>
-                        <div>
-                            <span className="text-xs text-gray-500 uppercase block font-semibold">Cut / Shape</span>
-                            <span className="font-bold text-gray-900">{certLog.data.cut_shape || 'N/A'}</span>
-                        </div>
-                        <div className="col-span-2">
-                            <span className="text-xs text-gray-500 uppercase block font-semibold">Treatment Status</span>
-                            <span className="font-bold text-emerald-800">{certLog.data.treatment_status || 'Unspecified'}</span>
-                        </div>
-                        {certLog.data.report_url && (
-                            <div>
-                                <span className="text-xs text-gray-500 uppercase block font-semibold">Online Verification</span>
-                                <a href={certLog.data.report_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline text-xs break-all">
-                                    Check Lab Report
-                                </a>
-                            </div>
-                        )}
-                    </div>
-                    {certLog.data.notes && (
-                        <div className="mt-3 text-xs text-gray-600 italic border-t pt-2">
-                            "{certLog.data.notes}"
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {/* PARTIAL SALES HISTORY (IF ANY SALES RECORDED) */}
-            {salesHistory.length > 0 && (
-                <div className="mb-8 avoid-break">
-                    <h3 className="text-lg font-bold mb-3 border-b">Sales History</h3>
-                    <table className="w-full text-sm text-left border">
-                        <thead>
-                            <tr className="bg-gray-100 border-b text-xs uppercase font-bold text-gray-600">
-                                <th className="p-2">Date</th>
-                                <th className="p-2">Buyer</th>
-                                <th className="p-2">Item Type</th>
-                                <th className="p-2 text-right">Pcs</th>
-                                <th className="p-2 text-right">Carats</th>
-                                <th className="p-2 text-right">Sale Price</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {salesHistory.map((sale: any, idx: number) => (
-                                <tr key={sale.id || idx} className="border-b">
-                                    <td className="p-2 font-mono text-xs">{sale.date ? format(new Date(sale.date), 'MMM dd, yyyy') : '-'}</td>
-                                    <td className="p-2 font-medium">{sale.buyer || 'Unknown'}</td>
-                                    <td className="p-2">{sale.item_type}</td>
-                                    <td className="p-2 text-right">{sale.sold_pieces || '-'}</td>
-                                    <td className="p-2 text-right font-mono">{Number(sale.sold_carats || 0).toFixed(2)}</td>
-                                    <td className="p-2 text-right font-mono font-semibold">{formatCurrency(Number(sale.price) || 0)}</td>
-                                </tr>
-                            ))}
-                            <tr className="bg-green-50 font-bold border-t-2 border-black">
-                                <td colSpan={3} className="p-2">TOTAL SALES RECORDED</td>
-                                <td className="p-2 text-right">{salesHistory.reduce((sum, s) => sum + (Number(s.sold_pieces) || 0), 0)}</td>
-                                <td className="p-2 text-right font-mono">{salesHistory.reduce((sum, s) => sum + (Number(s.sold_carats) || 0), 0).toFixed(2)}</td>
-                                <td className="p-2 text-right font-mono text-green-800">{formatCurrency(partialSalesTotal)}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            )}
-
-            {/* CURRENT VALUATION / ACTIVE STOCK */}
-            {valuations.length > 0 && (
-                <div className="mb-8 avoid-break">
-                    <h3 className="text-lg font-bold mb-3 border-b">Remaining Inventory & Valuations</h3>
-                    <table className="w-full text-sm text-left border">
-                        <thead>
-                            <tr className="bg-gray-100 border-b text-xs uppercase font-bold text-gray-600">
-                                <th className="p-2">Type</th>
-                                <th className="p-2 text-right">Pcs</th>
-                                <th className="p-2 text-right">Carats</th>
-                                <th className="p-2 text-right">Price/Ct</th>
-                                <th className="p-2 text-right">Total Val</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {valuations.map((v: any, i: number) => (
-                                <tr key={i} className="border-b">
-                                    <td className="p-2 font-medium">{v.type}</td>
-                                    <td className="p-2 text-right">{v.pieces || '-'}</td>
-                                    <td className="p-2 text-right font-mono">{Number(v.carats || 0).toFixed(2)}</td>
-                                    <td className="p-2 text-right font-mono">{formatCurrency(Number(v.price_per_carat) || 0)}</td>
-                                    <td className="p-2 text-right font-mono font-medium">{formatCurrency(Number(v.total_val) || 0)}</td>
-                                </tr>
-                            ))}
-                            <tr className="bg-gray-50 font-bold border-t-2 border-black">
-                                <td className="p-2">ACTIVE VALUATION TOTAL</td>
-                                <td className="p-2 text-right">{valuations.reduce((sum: number, v: any) => sum + (Number(v.pieces) || 0), 0)}</td>
-                                <td className="p-2 text-right font-mono">{valuations.reduce((sum: number, v: any) => sum + (Number(v.carats) || 0), 0).toFixed(2)}</td>
-                                <td className="p-2"></td>
-                                <td className="p-2 text-right font-mono text-blue-800">{formatCurrency(valuationTotal)}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            )}
-
-            {/* PHOTOS */}
-            {assets && assets.length > 0 && (
-                <div className="mb-8 avoid-break">
-                    <h3 className="text-lg font-bold mb-3 border-b">Evidence & Media Assets</h3>
-                    <div className="grid grid-cols-3 gap-4">
-                        {assets.map((asset) => (
-                            <div key={asset.id} className="border p-1 rounded">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img
-                                    src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/lot-evidence/${asset.file_path}`}
-                                    alt="Evidence"
-                                    className="w-full h-40 object-cover rounded bg-gray-100"
+                {/* 2. Master Gemological Dossier Document */}
+                <article className="obsidian-card rounded-3xl p-6 sm:p-10 lg:p-12 border border-white/10 shadow-2xl relative overflow-hidden print:bg-white print:text-black print:p-0 print:border-none print:shadow-none">
+                    {/* Header Crest */}
+                    <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 pb-6 border-b border-white/10 print:border-black/20 relative">
+                        <div className="flex items-center gap-4">
+                            <div className="w-14 h-14 rounded-2xl bg-slate-900 border border-amber-500/40 p-2 flex items-center justify-center shadow-[0_0_20px_rgba(212,161,55,0.25)] shrink-0 print:border-black/30">
+                                <Image
+                                    src="/logo.png"
+                                    alt="Vault Crest"
+                                    width={44}
+                                    height={44}
+                                    className="object-contain"
                                 />
-                                <div className="text-[10px] text-gray-500 mt-1 truncate px-1 font-mono">
-                                    {asset.file_path.split('/')[1]}
+                            </div>
+                            <div>
+                                <div className="text-[10px] uppercase tracking-[0.25em] text-amber-400 font-mono font-bold print:text-black">
+                                    Gemstone Lifecycle Audit Dossier
+                                </div>
+                                <h1 className="text-2xl sm:text-3xl font-bold font-serif text-white print:text-black tracking-tight mt-0.5">
+                                    {lot.lot_code}
+                                </h1>
+                            </div>
+                        </div>
+
+                        <div className="text-left sm:text-right font-mono text-xs text-slate-400 print:text-black">
+                            <span className="text-[10px] uppercase text-slate-500 print:text-black block">Generated On</span>
+                            <span className="text-white print:text-black font-bold">{new Date().toLocaleString()}</span>
+                            <div className="mt-1">
+                                <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20 font-semibold uppercase print:border-black/30 print:text-black">
+                                    Stage: {STAGE_DISPLAY_NAMES[lot.current_stage as LotStage] || lot.current_stage}
+                                </span>
+                            </div>
+                        </div>
+                    </header>
+
+                    {/* Section 1: Lot Overview & Weight Provenance */}
+                    <section className="py-6 border-b border-white/10 print:border-black/20">
+                        <div className="flex items-center gap-2 mb-4">
+                            <Gem className="w-4 h-4 text-amber-400 print:text-black" />
+                            <h2 className="font-serif font-bold text-base text-white print:text-black">
+                                Provenance &amp; Weight Specifications
+                            </h2>
+                        </div>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs font-mono">
+                            <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5 print:border-black/20 print:bg-transparent">
+                                <span className="text-[10px] text-slate-500 print:text-black block">Supplier / Source</span>
+                                <span className="font-bold text-white print:text-black text-sm">{lot.supplier || 'N/A'}</span>
+                            </div>
+
+                            <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5 print:border-black/20 print:bg-transparent">
+                                <span className="text-[10px] text-slate-500 print:text-black block">Acquisition Date</span>
+                                <span className="font-bold text-white print:text-black text-sm">
+                                    {lot.purchase_date ? new Date(lot.purchase_date).toLocaleDateString() : new Date(lot.created_at).toLocaleDateString()}
+                                </span>
+                            </div>
+
+                            <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5 print:border-black/20 print:bg-transparent">
+                                <span className="text-[10px] text-slate-500 print:text-black block">Initial Rough Mass</span>
+                                <span className="font-bold text-white print:text-black text-sm">{initialWeight.toFixed(2)} ct</span>
+                            </div>
+
+                            <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5 print:border-black/20 print:bg-transparent">
+                                <span className="text-[10px] text-slate-500 print:text-black block">Current Cut Mass</span>
+                                <span className="font-bold text-emerald-400 print:text-black text-sm">{currentWeight.toFixed(2)} ct</span>
+                                <span className="text-[10px] text-slate-500 print:text-black block mt-0.5">{recoveryRate}% retention</span>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* Section 2: Chronological Lifecycle Stages & Processing Costs */}
+                    <section className="py-6 border-b border-white/10 print:border-black/20">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-2">
+                                <Scale className="w-4 h-4 text-amber-400 print:text-black" />
+                                <h2 className="font-serif font-bold text-base text-white print:text-black">
+                                    Stage History &amp; Operational Costs
+                                </h2>
+                            </div>
+                            <span className="text-[10px] font-mono text-slate-500 print:text-black">
+                                {logs?.length || 0} RECORDED STAGES
+                            </span>
+                        </div>
+
+                        <div className="overflow-x-auto rounded-xl border border-white/5 print:border-black/20">
+                            <table className="w-full text-xs text-left">
+                                <thead className="bg-white/[0.03] print:bg-black/5 font-mono uppercase text-[10px] text-slate-400 print:text-black">
+                                    <tr>
+                                        <th className="p-3">Sequence</th>
+                                        <th className="p-3">Stage</th>
+                                        <th className="p-3">Timestamp</th>
+                                        <th className="p-3">Operational Notes / Summary</th>
+                                        <th className="p-3 text-right">Cost (LKR)</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-white/5 print:divide-black/10">
+                                    {/* Line Item: Rough Procurement */}
+                                    <tr className="hover:bg-white/[0.02]">
+                                        <td className="p-3 font-mono text-slate-500 print:text-black">01</td>
+                                        <td className="p-3 font-semibold text-amber-400 print:text-black">PROCUREMENT</td>
+                                        <td className="p-3 font-mono text-slate-400 print:text-black">
+                                            {lot.purchase_date ? new Date(lot.purchase_date).toLocaleDateString() : new Date(lot.created_at).toLocaleDateString()}
+                                        </td>
+                                        <td className="p-3 text-slate-300 print:text-black">
+                                            Initial rough parcel acquisition from {lot.supplier || 'Supplier'} ({initialWeight.toFixed(2)} ct)
+                                        </td>
+                                        <td className="p-3 text-right font-mono font-bold text-white print:text-black">
+                                            {formatCurrency(buyingPrice)}
+                                        </td>
+                                    </tr>
+
+                                    {/* Every Subsequent Stage Log */}
+                                    {logs?.filter(l => l.stage !== 'PROCUREMENT').map((log, idx) => (
+                                        <tr key={log.id || idx} className="hover:bg-white/[0.02]">
+                                            <td className="p-3 font-mono text-slate-500 print:text-black">
+                                                {String(log.sequence_number || idx + 2).padStart(2, '0')}
+                                            </td>
+                                            <td className="p-3 font-semibold text-white print:text-black">
+                                                {STAGE_DISPLAY_NAMES[log.stage as LotStage] || log.stage}
+                                            </td>
+                                            <td className="p-3 font-mono text-slate-400 print:text-black">
+                                                {log.entered_at ? new Date(log.entered_at).toLocaleDateString() : '-'}
+                                            </td>
+                                            <td className="p-3 text-slate-300 print:text-black">
+                                                {log.stage === 'GAS_BURN' && log.data?.temperature && `Gas burn @ ${log.data.temperature}°C (${log.data.duration_hours || '-'}h)`}
+                                                {log.stage === 'ELECTRIC_BURN' && log.data?.temperature && `Electric burn @ ${log.data.temperature}°C (${log.data.duration_hours || '-'}h)`}
+                                                {log.stage === 'CERTIFICATION' && log.data?.lab_name && `Certified by ${log.data.lab_name} (#${log.data.certificate_number || '-'})`}
+                                                {log.stage === 'SELL_READY' && 'Valuation & inventory appraisal established'}
+                                                {log.stage === 'SOLD' && `Lot finalized and sold`}
+                                                {!['GAS_BURN', 'ELECTRIC_BURN', 'CERTIFICATION', 'SELL_READY', 'SOLD'].includes(log.stage) && (log.data?.notes || 'Stage operations completed')}
+                                            </td>
+                                            <td className="p-3 text-right font-mono font-bold text-white print:text-black">
+                                                {formatCurrency(Number(log.cost) || 0)}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Financial Totals Reconciliation Grid */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 font-mono">
+                            <div className="bg-white/[0.02] border border-white/5 print:border-black/20 rounded-xl p-4">
+                                <span className="text-[10px] text-slate-500 print:text-black uppercase block font-semibold">Total Cost (Investment)</span>
+                                <div className="text-xl font-bold font-serif text-white print:text-black mt-1">
+                                    {formatCurrency(totalInvestment)}
+                                </div>
+                                <span className="text-[10px] text-slate-500 print:text-black">
+                                    Rough: {formatCurrency(buyingPrice)} + Processing: {formatCurrency(totalProcessingCost)}
+                                </span>
+                            </div>
+
+                            <div className="bg-white/[0.02] border border-white/5 print:border-black/20 rounded-xl p-4">
+                                <span className="text-[10px] text-slate-500 print:text-black uppercase font-semibold">Realized Revenue</span>
+                                <div className="text-xl font-bold font-serif text-white print:text-black mt-1">
+                                    {formatCurrency(totalRealizedRevenue)}
+                                </div>
+                                <span className="text-[10px] text-slate-500 print:text-black">
+                                    {salesHistory.length > 0 ? `${salesHistory.length} recorded sales` : 'Pending lot sales'}
+                                </span>
+                            </div>
+
+                            <div className={`rounded-xl p-4 border ${realizedProfit >= 0 ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-rose-500/10 border-rose-500/20'} print:border-black/20`}>
+                                <span className={`text-[10px] uppercase font-semibold block ${realizedProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'} print:text-black`}>
+                                    Realized Net Profit
+                                </span>
+                                <div className={`text-xl font-bold font-serif mt-1 ${realizedProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'} print:text-black`}>
+                                    {realizedProfit >= 0 ? '+' : ''}{formatCurrency(realizedProfit)}
+                                </div>
+                                <span className={`text-[10px] ${realizedProfit >= 0 ? 'text-emerald-400/80' : 'text-rose-400/80'} print:text-black`}>
+                                    Revenue minus total investment
+                                </span>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* Section 3: Certification Details (If Certified) */}
+                    {certLog && certLog.data && (certLog.data.lab_name || certLog.data.certificate_number) && (
+                        <section className="py-6 border-b border-white/10 print:border-black/20">
+                            <div className="flex items-center gap-2 mb-4">
+                                <Award className="w-4 h-4 text-yellow-400 print:text-black" />
+                                <h2 className="font-serif font-bold text-base text-white print:text-black">
+                                    Laboratory Certification &amp; Assay
+                                </h2>
+                            </div>
+
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs font-mono bg-white/[0.02] border border-white/5 print:border-black/20 p-4 rounded-xl">
+                                <div>
+                                    <span className="text-[10px] text-slate-500 print:text-black uppercase block">Lab Name</span>
+                                    <span className="font-bold text-white print:text-black">{certLog.data.lab_name || 'N/A'}</span>
+                                </div>
+                                <div>
+                                    <span className="text-[10px] text-slate-500 print:text-black uppercase block">Certificate #</span>
+                                    <span className="font-bold text-white print:text-black">{certLog.data.certificate_number || 'N/A'}</span>
+                                </div>
+                                <div>
+                                    <span className="text-[10px] text-slate-500 print:text-black uppercase block">Color &amp; Clarity</span>
+                                    <span className="font-bold text-white print:text-black">
+                                        {certLog.data.color_grade || '-'} • {certLog.data.clarity_grade || '-'}
+                                    </span>
+                                </div>
+                                <div>
+                                    <span className="text-[10px] text-slate-500 print:text-black uppercase block">Treatment Status</span>
+                                    <span className="font-bold text-emerald-400 print:text-black">{certLog.data.treatment_status || 'Unheated / Natural'}</span>
                                 </div>
                             </div>
-                        ))}
-                    </div>
-                </div>
-            )}
+                        </section>
+                    )}
 
-            <div className="mt-12 text-center text-xs text-gray-400 border-t pt-4">
-                Generated by Gemstone Lifecycle Management System • {new Date().toLocaleString()}
+                    {/* Section 4: Sales History (If any recorded) */}
+                    {salesHistory.length > 0 && (
+                        <section className="py-6 border-b border-white/10 print:border-black/20">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-2">
+                                    <DollarSign className="w-4 h-4 text-emerald-400 print:text-black" />
+                                    <h2 className="font-serif font-bold text-base text-white print:text-black">
+                                        Recorded Sales Ledger
+                                    </h2>
+                                </div>
+                                <span className="text-[10px] font-mono text-slate-500 print:text-black">
+                                    {salesHistory.length} TRANSACTIONS
+                                </span>
+                            </div>
+
+                            <div className="overflow-x-auto rounded-xl border border-white/5 print:border-black/20">
+                                <table className="w-full text-xs text-left">
+                                    <thead className="bg-white/[0.03] print:bg-black/5 font-mono uppercase text-[10px] text-slate-400 print:text-black">
+                                        <tr>
+                                            <th className="p-3">Date</th>
+                                            <th className="p-3">Buyer</th>
+                                            <th className="p-3">Item Type</th>
+                                            <th className="p-3 text-right">Pieces</th>
+                                            <th className="p-3 text-right">Carats</th>
+                                            <th className="p-3 text-right">Sale Amount (LKR)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-white/5 print:divide-black/10">
+                                        {salesHistory.map((sale: any, idx: number) => (
+                                            <tr key={sale.id || idx} className="hover:bg-white/[0.02]">
+                                                <td className="p-3 font-mono text-slate-400 print:text-black">
+                                                    {sale.date ? format(new Date(sale.date), 'MMM dd, yyyy') : '-'}
+                                                </td>
+                                                <td className="p-3 font-semibold text-white print:text-black">{sale.buyer || 'Unknown'}</td>
+                                                <td className="p-3 text-slate-300 print:text-black">{sale.item_type}</td>
+                                                <td className="p-3 text-right font-mono text-slate-300 print:text-black">{sale.sold_pieces || '-'}</td>
+                                                <td className="p-3 text-right font-mono text-slate-300 print:text-black">{Number(sale.sold_carats || 0).toFixed(2)}</td>
+                                                <td className="p-3 text-right font-mono font-bold text-emerald-400 print:text-black">
+                                                    {formatCurrency(Number(sale.price) || 0)}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+                    )}
+
+                    {/* Section 5: Valuations & Remaining Inventory (If Available) */}
+                    {valuations.length > 0 && (
+                        <section className="py-6 border-b border-white/10 print:border-black/20">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-2">
+                                    <Gem className="w-4 h-4 text-amber-400 print:text-black" />
+                                    <h2 className="font-serif font-bold text-base text-white print:text-black">
+                                        Remaining Inventory &amp; Appraisals
+                                    </h2>
+                                </div>
+                                <span className="text-[10px] font-mono text-slate-500 print:text-black">
+                                    TOTAL VALUATION: {formatCurrency(valuationTotal)}
+                                </span>
+                            </div>
+
+                            <div className="overflow-x-auto rounded-xl border border-white/5 print:border-black/20">
+                                <table className="w-full text-xs text-left">
+                                    <thead className="bg-white/[0.03] print:bg-black/5 font-mono uppercase text-[10px] text-slate-400 print:text-black">
+                                        <tr>
+                                            <th className="p-3">Variety / Cut Item</th>
+                                            <th className="p-3 text-right">Pieces</th>
+                                            <th className="p-3 text-right">Carats</th>
+                                            <th className="p-3 text-right">Price Per Carat</th>
+                                            <th className="p-3 text-right">Total Appraised Value</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-white/5 print:divide-black/10">
+                                        {valuations.map((v: any, idx: number) => (
+                                            <tr key={idx} className="hover:bg-white/[0.02]">
+                                                <td className="p-3 font-semibold text-white print:text-black">{v.type}</td>
+                                                <td className="p-3 text-right font-mono text-slate-300 print:text-black">{v.pieces || '-'}</td>
+                                                <td className="p-3 text-right font-mono text-slate-300 print:text-black">{Number(v.carats || 0).toFixed(2)}</td>
+                                                <td className="p-3 text-right font-mono text-slate-400 print:text-black">{formatCurrency(Number(v.price_per_carat) || 0)}</td>
+                                                <td className="p-3 text-right font-mono font-bold text-amber-300 print:text-black">
+                                                    {formatCurrency(Number(v.total_val) || 0)}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+                    )}
+
+                    {/* Section 6: Uploaded Media & Photographic Evidence */}
+                    {assets && assets.length > 0 && (
+                        <section className="py-6 border-b border-white/10 print:border-black/20">
+                            <div className="flex items-center gap-2 mb-4">
+                                <Camera className="w-4 h-4 text-blue-400 print:text-black" />
+                                <h2 className="font-serif font-bold text-base text-white print:text-black">
+                                    Verified Photographic Evidence ({assets.length})
+                                </h2>
+                            </div>
+
+                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                                {assets.map((asset) => (
+                                    <div key={asset.id} className="rounded-xl border border-white/5 print:border-black/20 p-1 bg-white/[0.02] print:bg-transparent">
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img
+                                            src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/lot-evidence/${asset.file_path}`}
+                                            alt="Evidence"
+                                            className="w-full h-36 object-cover rounded-lg bg-slate-900"
+                                        />
+                                        <div className="text-[10px] text-slate-400 print:text-black font-mono mt-1 px-1 truncate">
+                                            {asset.file_path.split('/').pop()}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </section>
+                    )}
+
+                    {/* Footer */}
+                    <footer className="pt-6 text-center text-xs font-mono text-slate-500 print:text-black">
+                        Gemstone Processing &amp; Lifecycle Management System • Certified Digital Record
+                    </footer>
+                </article>
             </div>
-        </div>
+        </VaultShell>
     )
 }

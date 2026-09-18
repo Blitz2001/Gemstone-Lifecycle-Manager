@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { Button } from '@/components/ui/button'
+import Image from 'next/image'
 import { format } from 'date-fns'
 import { TransitionControls } from '@/components/lot/transition-controls'
 import { LotStage, STAGE_DISPLAY_NAMES } from '@/lib/state-machine'
@@ -21,16 +21,24 @@ import { getCurrentUserRole } from '@/lib/auth-utils'
 import { DeleteLotButton } from '@/components/lot/delete-lot-button'
 import { CertificationReport } from '@/components/lot/certification-report'
 import { ElectricBurnReport } from '@/components/lot/electric-burn-report'
+import { VaultShell } from '@/components/layout/vault-shell'
+import { 
+  ArrowLeft, 
+  FileText, 
+  Gem, 
+  Scale, 
+  DollarSign, 
+  Calendar, 
+  Camera,
+  Layers
+} from 'lucide-react'
 
 export default async function LotPage({ params }: { params: Promise<{ id: string }> }) {
     const supabase = await createClient()
     const { id } = await params
 
-    // Ensure storage bucket exists (Auto-Fix for Dev)
+    // Ensure storage bucket exists
     await createStorageBucket()
-
-    // Debug log to verify ID
-    console.log('Fetching Lot ID:', id);
 
     const { data: lot, error: lotError } = await supabase
         .from('lots')
@@ -39,7 +47,7 @@ export default async function LotPage({ params }: { params: Promise<{ id: string
         .single()
 
     if (lotError && lotError.code !== 'PGRST116') {
-        console.error('Error fetching lot:', lotError);
+        console.error('Error fetching lot:', lotError)
     }
 
     if (!lot) {
@@ -53,22 +61,26 @@ export default async function LotPage({ params }: { params: Promise<{ id: string
         .eq('lot_id', id)
         .order('sequence_number', { ascending: true })
 
+    // Fetch Assets (Photos)
+    const { data: assets } = await supabase
+        .from('lot_assets')
+        .select('*')
+        .eq('lot_id', id)
+        .order('created_at', { ascending: true })
+
     // 1. Get Initial Composition from Procurement
     const procurementLog = logs?.find(l => l.stage === LotStage.PROCUREMENT)
     const initialComposition = procurementLog?.data?.rough_composition || {}
 
     // 2. Compute Current Composition & Total Cost
     let currentComposition = { ...initialComposition }
-    // Initialize with Lot Purchase Price (if any) + Sum of Processing Costs
     let totalCost = (Number(lot.purchase_price) || 0)
 
     if (logs) {
         logs.forEach(log => {
-            // Cost calculation
             totalCost += (Number(log.cost) || 0)
 
             if (log.stage === 'ELECTRIC_BURN' && log.data?.breakdown) {
-                // TRANSFORMATION: Wipe previous types and set new Color/Clarity types
                 currentComposition = {}
                 log.data.breakdown.forEach((item: any) => {
                     const key = `${item.color} ${item.clarity}`
@@ -78,11 +90,8 @@ export default async function LotPage({ params }: { params: Promise<{ id: string
                     }
                 })
             } else if (log.stage === 'GAS_BURN' && log.data?.breakdown) {
-                // TRANSFORMATION (Gas Burn): Wipe previous and set new from Gas Burn results
                 currentComposition = {}
                 log.data.breakdown.forEach((item: any) => {
-                    // IF it's a source type (remainder), use JUST the name (e.g. "Silky Geuda")
-                    // ELSE use Color + Clarity (e.g. "Royal Blue IF")
                     const isSourceType = initialComposition && initialComposition[item.color]
                     const key = isSourceType ? item.color : `${item.color} ${item.clarity}`
 
@@ -92,12 +101,11 @@ export default async function LotPage({ params }: { params: Promise<{ id: string
                     }
                 })
             } else if (log.data?.measurements) {
-                // If this stage recorded new measurements, update the tracking
                 Object.entries(log.data.measurements).forEach(([type, stats]: [string, any]) => {
                     if (currentComposition[type]) {
                         currentComposition[type] = {
                             ...currentComposition[type],
-                            carats: stats.carats, // Update to new current weight
+                            carats: stats.carats,
                             pieces: stats.pieces
                         }
                     }
@@ -106,7 +114,7 @@ export default async function LotPage({ params }: { params: Promise<{ id: string
         })
     }
 
-    // 3. Extract Metrics (Electric Burn / Intelligence)
+    // 3. Extract Metrics
     const metrics = extractMetrics(logs || [], lot.current_stage as LotStage)
 
     // 4. Get active valuations and sales history for Partial Sales
@@ -114,7 +122,6 @@ export default async function LotPage({ params }: { params: Promise<{ id: string
     const valuations = sellReadyLog?.data?.valuations || []
     const salesHistory = sellReadyLog?.data?.sales_history || []
 
-    // In SELL_READY stage, reflect live remaining inventory after any partial sales
     if (lot.current_stage === 'SELL_READY' && valuations.length > 0) {
         currentComposition = {}
         valuations.forEach((item: any) => {
@@ -125,129 +132,230 @@ export default async function LotPage({ params }: { params: Promise<{ id: string
         })
     }
 
-    // 5. Get current user role for RBAC
+    // 5. User role for RBAC
     const userRole = await getCurrentUserRole()
     const isAdmin = userRole === 'admin'
 
+    // Calculations for Header
+    const initialWt = Number(lot.initial_weight) || 0
+    const currentWt = Number(lot.current_weight) || initialWt
+    const yieldRate = initialWt > 0 ? ((currentWt / initialWt) * 100).toFixed(1) : '100.0'
+    const lossRate = (100 - Number(yieldRate)).toFixed(1)
+
+    const stageDisplayName = (lot.current_stage === 'SELL_READY' && lot.is_finalized)
+        ? 'Sold'
+        : (STAGE_DISPLAY_NAMES[lot.current_stage as LotStage] || lot.current_stage)
+
+    const formatCurrency = (val: number) => {
+        return `LKR ${(val || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+    }
+
     return (
-        <div className="container mx-auto py-6 space-y-6">
-            {/* Actions Header */}
-            <div className="flex justify-between items-center">
-                <Link href="/" className="text-muted-foreground hover:text-foreground flex items-center gap-1">
-                    &larr; Back to Dashboard
-                </Link>
-                <div className="flex gap-2">
-                    <Link href={`/lots/${id}/report`}>
-                        <Button variant="outline" size="sm">
-                            Print Report
-                        </Button>
+        <VaultShell>
+            <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1500px] mx-auto w-full">
+                {/* 1. TOP BREADCRUMB & ACTION CONTROLS */}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <Link 
+                        href="/" 
+                        className="inline-flex items-center gap-1.5 text-xs font-mono text-slate-400 hover:text-amber-300 transition-colors"
+                    >
+                        <ArrowLeft className="h-3.5 w-3.5" />
+                        Back to Dashboard
                     </Link>
-                    <DeleteLotButton lotId={lot.id} lotCode={lot.lot_code} isAdmin={isAdmin} />
-                </div>
-            </div>
 
-            {/* Main Header */}
-            <div className="flex flex-col md:flex-row justify-between items-start gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight">{lot.lot_code}</h1>
-                    <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mt-1">
-                        {lot.purchase_date ? (
-                            <span className="font-semibold text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded border border-emerald-500/20">
-                                Buying Date: {new Date(lot.purchase_date).toLocaleDateString(undefined, { dateStyle: 'long' })}
+                    <div className="flex items-center gap-2.5 self-end sm:self-auto">
+                        <Link href={`/lots/${id}/report`}>
+                            <button className="bg-white/[0.04] hover:bg-white/10 text-white border border-white/10 px-3.5 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5 transition-all">
+                                <FileText className="w-3.5 h-3.5 text-amber-400" />
+                                <span>Print Dossier</span>
+                            </button>
+                        </Link>
+                        <DeleteLotButton lotId={lot.id} lotCode={lot.lot_code} isAdmin={isAdmin} />
+                    </div>
+                </div>
+
+                {/* 2. LOT OVERVIEW HERO CARD */}
+                <div className="obsidian-card rounded-2xl p-6 border border-white/5 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-80 h-80 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
+
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative">
+                        <div>
+                            <div className="flex items-center gap-2 mb-2">
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-bold font-mono">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                                    STAGE: {stageDisplayName.toUpperCase()}
+                                </span>
+                                {lot.is_finalized && (
+                                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                        SEALED
+                                    </span>
+                                )}
+                            </div>
+
+                            <h1 className="text-2xl lg:text-3xl font-bold font-serif text-white tracking-tight flex items-center gap-2.5">
+                                <span>{lot.lot_code}</span>
+                                {lot.supplier && (
+                                    <span className="text-slate-400 font-sans font-normal text-sm">
+                                        • {lot.supplier}
+                                    </span>
+                                )}
+                            </h1>
+
+                            <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400 mt-2 font-mono">
+                                {lot.purchase_date ? (
+                                    <span className="flex items-center gap-1 text-slate-300">
+                                        <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                                        Buying Date: {new Date(lot.purchase_date).toLocaleDateString(undefined, { dateStyle: 'long' })}
+                                    </span>
+                                ) : (
+                                    <span>Created {new Date(lot.created_at).toLocaleDateString(undefined, { dateStyle: 'long' })}</span>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Top Right Financial & Weight Snapshot */}
+                        <div className="flex flex-wrap items-center gap-4 lg:gap-6 font-mono text-xs">
+                            <div className="bg-white/[0.02] border border-white/5 rounded-xl px-4 py-2.5">
+                                <span className="text-[10px] uppercase text-slate-500 block font-semibold">Rough Mass</span>
+                                <span className="text-white font-bold text-sm">{initialWt.toFixed(2)} <span className="text-slate-400 text-xs">ct</span></span>
+                            </div>
+                            <div className="bg-white/[0.02] border border-white/5 rounded-xl px-4 py-2.5">
+                                <span className="text-[10px] uppercase text-slate-500 block font-semibold">Current Cut</span>
+                                <span className="text-emerald-400 font-bold text-sm">{currentWt.toFixed(2)} <span className="text-slate-400 text-xs">ct</span></span>
+                            </div>
+                            <div className="bg-white/[0.02] border border-white/5 rounded-xl px-4 py-2.5">
+                                <span className="text-[10px] uppercase text-slate-500 block font-semibold">Retention Yield</span>
+                                <span className="text-white font-bold text-sm">{yieldRate}% <span className="text-rose-400 text-xs font-normal">(-{lossRate}%)</span></span>
+                            </div>
+                            <div className="bg-white/[0.02] border border-white/5 rounded-xl px-4 py-2.5">
+                                <span className="text-[10px] uppercase text-slate-500 block font-semibold">Total Cost</span>
+                                <span className="text-amber-300 font-bold text-base font-serif">{formatCurrency(totalCost)}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* 3. MATERIAL RETENTION MATRIX */}
+                <section aria-label="Material Retention Matrix" className="obsidian-card rounded-2xl p-6 border border-white/5">
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                            <Scale className="w-4 h-4 text-emerald-400" />
+                            <h2 className="font-serif font-bold text-base text-white">
+                                Weight Retention &amp; Carat Yield
+                            </h2>
+                        </div>
+                        <span className="text-[10px] font-mono text-slate-400">
+                            BASELINE: {initialWt.toFixed(2)} ct
+                        </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                        <div className="bg-white/[0.02] border border-white/5 rounded-xl p-3.5">
+                            <span className="text-[10px] uppercase font-mono tracking-wider text-slate-400 block mb-1">
+                                Initial Rough Weight
                             </span>
-                        ) : (
-                            <span>Created on {new Date(lot.created_at).toLocaleDateString(undefined, { dateStyle: 'long' })}</span>
-                        )}
-                        {lot.supplier && (
-                            <>
-                                <span>•</span>
-                                <span>Supplier: <strong className="text-foreground">{lot.supplier}</strong></span>
-                            </>
-                        )}
+                            <div className="text-xl font-bold font-serif text-white">
+                                {initialWt.toFixed(2)} <span className="text-xs font-sans font-normal text-slate-400">ct</span>
+                            </div>
+                        </div>
+
+                        <div className="bg-white/[0.02] border border-white/5 rounded-xl p-3.5">
+                            <span className="text-[10px] uppercase font-mono tracking-wider text-slate-400 block mb-1">
+                                Current Cut Weight
+                            </span>
+                            <div className="text-xl font-bold font-serif text-emerald-400">
+                                {currentWt.toFixed(2)} <span className="text-xs font-sans font-normal text-slate-400">ct</span>
+                            </div>
+                            <span className="text-[10px] text-emerald-400 font-mono">{yieldRate}% Net Retention</span>
+                        </div>
+
+                        <div className="bg-white/[0.02] border border-white/5 rounded-xl p-3.5">
+                            <span className="text-[10px] uppercase font-mono tracking-wider text-slate-400 block mb-1">
+                                Kerf &amp; Faceting Loss
+                            </span>
+                            <div className="text-xl font-bold font-serif text-rose-400">
+                                {(initialWt - currentWt).toFixed(2)} <span className="text-xs font-sans font-normal text-slate-400">ct</span>
+                            </div>
+                            <span className="text-[10px] text-rose-400 font-mono">-{lossRate}% Kerf Loss</span>
+                        </div>
                     </div>
-                </div>
-                <div className="text-left md:text-right">
-                    <div className="text-sm text-muted-foreground uppercase tracking-widest">Current Stage</div>
-                    <div className="text-2xl font-bold mb-1">
-                        {(lot.current_stage === 'SELL_READY' && lot.is_finalized)
-                            ? 'Sold'
-                            : (STAGE_DISPLAY_NAMES[lot.current_stage as LotStage] || lot.current_stage)}
+
+                    {/* Proportional Retention Bar */}
+                    <div className="space-y-1.5">
+                        <div className="h-2.5 w-full bg-slate-900 rounded-full overflow-hidden flex border border-white/5">
+                            <div 
+                                className="bg-gradient-to-r from-blue-500 to-emerald-400 h-full rounded-l-full" 
+                                style={{ width: `${yieldRate}%` }} 
+                            />
+                            <div 
+                                className="bg-rose-500/70 h-full rounded-r-full" 
+                                style={{ width: `${lossRate}%` }} 
+                            />
+                        </div>
+                        <div className="flex justify-between text-[10px] font-mono text-slate-400 pt-0.5">
+                            <span className="text-emerald-400">Yield: {currentWt.toFixed(2)} ct ({yieldRate}%)</span>
+                            <span className="text-rose-400">Loss: {(initialWt - currentWt).toFixed(2)} ct ({lossRate}%)</span>
+                        </div>
                     </div>
+                </section>
 
-                    {/* Total Cost Display */}
-                    <div className="text-sm font-medium text-muted-foreground">
-                        Total Cost: <span className="text-foreground font-bold">LKR {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                    </div>
-                </div>
-            </div>
-
-            {/* Procurement Overview Metadata Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-muted/30 p-4 rounded-xl border">
-                <div>
-                    <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold block">Buying Date</span>
-                    <span className="font-bold text-sm text-foreground">
-                        {lot.purchase_date ? new Date(lot.purchase_date).toLocaleDateString(undefined, { dateStyle: 'medium' }) : 'Not Specified'}
-                    </span>
-                </div>
-                <div>
-                    <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold block">Supplier</span>
-                    <span className="font-bold text-sm text-foreground">{lot.supplier || 'N/A'}</span>
-                </div>
-                <div>
-                    <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold block">Purchase Price</span>
-                    <span className="font-bold text-sm text-foreground">LKR {(Number(lot.purchase_price) || 0).toLocaleString()}</span>
-                </div>
-                <div>
-                    <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold block">Initial Rough Weight</span>
-                    <span className="font-bold text-sm text-foreground">{lot.initial_weight || 0} ct</span>
-                </div>
-            </div>
-
-            {/* Main Content Area */}
-            <div className="grid gap-6">
-                <TransitionControls
-                    lotId={lot.id}
-                    currentStage={lot.current_stage as LotStage}
-                    isFinalized={lot.is_finalized}
-                    composition={currentComposition}
-                    totalCost={totalCost}
-                    valuations={valuations}
-                    isAdmin={isAdmin}
-                />
-
-                {/* Partial Sales Manager (SELL_READY only) */}
-                {lot.current_stage === 'SELL_READY' && !lot.is_finalized && (
-                    <PartialSalesManager
+                {/* 4. STAGE TRANSITION CONTROLLER */}
+                <section aria-label="Stage Transition Controller">
+                    <TransitionControls
                         lotId={lot.id}
-                        valuations={valuations}
+                        currentStage={lot.current_stage as LotStage}
                         isFinalized={lot.is_finalized}
+                        composition={currentComposition}
+                        totalCost={totalCost}
+                        valuations={valuations}
                         isAdmin={isAdmin}
                     />
+                </section>
+
+                {/* 5. PARTIAL SALES CONTROLS (IF SELL_READY STAGE) */}
+                {lot.current_stage === 'SELL_READY' && !lot.is_finalized && valuations.length > 0 && (
+                    <section aria-label="Partial Sales Manager">
+                        <PartialSalesManager
+                            lotId={lot.id}
+                            valuations={valuations}
+                            isFinalized={lot.is_finalized}
+                            isAdmin={isAdmin}
+                        />
+                    </section>
                 )}
 
-                {/* Partial Sales History */}
+                {/* 6. PARTIAL SALES HISTORY */}
                 {lot.current_stage === 'SELL_READY' && salesHistory.length > 0 && (
-                    <PartialSalesHistory salesHistory={salesHistory} />
+                    <section aria-label="Sales History">
+                        <PartialSalesHistory salesHistory={salesHistory} />
+                    </section>
                 )}
 
-                {/* Evidence Upload (Current Stage) */}
-                <div className="grid md:grid-cols-1 gap-4">
+                {/* 7. EVIDENCE UPLOAD CONTROLLER */}
+                <section aria-label="Evidence Upload" className="obsidian-card rounded-2xl p-6 border border-white/5">
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                            <Camera className="w-4 h-4 text-amber-400" />
+                            <h2 className="font-serif font-bold text-base text-white">
+                                Stage Photographic Evidence
+                            </h2>
+                        </div>
+                        <span className="text-[10px] font-mono text-slate-400">
+                            STAGE: {lot.current_stage}
+                        </span>
+                    </div>
+
                     <EvidenceUpload
                         lotId={lot.id}
                         stage={lot.current_stage}
                         isFinalized={lot.is_finalized}
                         isAdmin={isAdmin}
                     />
-                </div>
+                </section>
 
-                {/* Metrics Display (Intelligence) - Only shows if metrics exist */}
-                {metrics && (
-                    <div className="grid md:grid-cols-1 gap-4">
-                        <MetricsDisplay metrics={metrics} />
-                    </div>
-                )}
-
-                {/* LOGIC: Find Electric Burn Data for Report & Lineage */}
+                {/* 8. GENUINE STAGE REPORTS (ELECTRIC BURN, GAS BURN, CERTIFICATION, SOLD, VALUATIONS) */}
+                
+                {/* Electric Burn Report & Transformation Lineage */}
                 {(() => {
                     const electricBurnLog = logs?.find(l => l.stage === 'ELECTRIC_BURN' && l.data?.breakdown)
                     if (electricBurnLog) {
@@ -261,106 +369,79 @@ export default async function LotPage({ params }: { params: Promise<{ id: string
                     return null
                 })()}
 
-                {/* LOGIC: Find Gas Burn Data for Report */}
+                {/* Gas Burn Report */}
                 {(() => {
-                    // Get the LATEST gas burn log to reflect current state
-                    const gasBurnLogs = logs?.filter(l => l.stage === 'GAS_BURN' && l.data?.breakdown)
-                    const gasBurnLog = gasBurnLogs?.[gasBurnLogs.length - 1]
-
+                    const gasBurnLog = logs?.slice().reverse().find(l => l.stage === 'GAS_BURN' && l.data?.breakdown)
                     if (gasBurnLog) {
                         return (
-                            <div className="grid md:grid-cols-1 gap-4">
-                                <GasBurnReport
-                                    lotId={lot.id}
-                                    stageData={gasBurnLog.data}
-                                    initialComposition={initialComposition}
-                                    currentComposition={currentComposition}
-                                    currentStage={lot.current_stage}
-                                />
-                            </div>
+                            <GasBurnReport
+                                lotId={lot.id}
+                                stageData={gasBurnLog.data}
+                                initialComposition={initialComposition}
+                            />
                         )
                     }
                     return null
                 })()}
 
-                {/* LOGIC: Find Certification Data for Report */}
+                {/* Certification Report */}
                 {(() => {
                     const certLog = logs?.find(l => (l.stage === 'CERTIFICATION' || l.stage === LotStage.CERTIFICATION) && l.data)
-                    if (certLog) {
-                        return (
-                            <div className="grid md:grid-cols-1 gap-4">
-                                <CertificationReport data={certLog.data} />
-                            </div>
-                        )
+                    if (certLog && (certLog.data.lab_name || certLog.data.certificate_number)) {
+                        return <CertificationReport data={certLog.data} />
                     }
                     return null
                 })()}
 
-                {/* LOGIC: Find Sold Data (Final Results) */}
+                {/* Sold / Final Sale Summary */}
                 {(() => {
-                    // PRIMARY: If Finalized in SELL_READY, the Sell Ready log contains the sale data
-                    if (lot.is_finalized && (lot.current_stage === 'SELL_READY' || lot.current_stage === 'SOLD')) {
-                        const targetLog = logs?.find(l => l.stage === 'SELL_READY' || l.stage === 'SOLD')
-                        if (targetLog) {
-                            return (
-                                <div className="grid md:grid-cols-1 gap-4">
-                                    <SaleSummary
-                                        saleData={targetLog.data}
-                                        totalCost={totalCost}
-                                        createdAt={lot.created_at}
-                                    />
-                                </div>
-                            )
-                        }
+                    const soldLog = logs?.find(l => l.stage === 'SOLD' && l.data?.sold_price)
+                    if (soldLog) {
+                        return (
+                            <SaleSummary
+                                saleData={soldLog.data}
+                                totalCost={totalCost}
+                                createdAt={lot.created_at}
+                            />
+                        )
                     }
-
-                    // FALLBACK: Scan for any log with sold_price (Legacy/Safety)
                     const existingSoldLog = logs?.find(l => l.data?.sold_price)
                     if (existingSoldLog) {
                         return (
-                            <div className="grid md:grid-cols-1 gap-4">
-                                <SaleSummary
-                                    saleData={existingSoldLog.data}
-                                    totalCost={totalCost}
-                                    createdAt={lot.created_at}
-                                />
-                            </div>
+                            <SaleSummary
+                                saleData={existingSoldLog.data}
+                                totalCost={totalCost}
+                                createdAt={lot.created_at}
+                            />
                         )
                     }
                     return null
                 })()}
 
-                {/* LOGIC: Find Sell Ready Prediction Data */}
+                {/* Valuation Summary */}
                 {(() => {
-                    const sellReadyLog = logs?.find(l => l.stage === 'SELL_READY' && l.data?.valuations)
-                    if (sellReadyLog) {
+                    const sellReadyLogWithVal = logs?.find(l => l.stage === 'SELL_READY' && l.data?.valuations)
+                    if (sellReadyLogWithVal) {
                         return (
-                            <div className="grid md:grid-cols-1 gap-4">
-                                <ValuationSummary
-                                    valuations={sellReadyLog.data.valuations}
-                                    totalCost={totalCost}
-                                />
-                            </div>
+                            <ValuationSummary
+                                valuations={sellReadyLogWithVal.data.valuations}
+                                totalCost={totalCost}
+                            />
                         )
                     }
                     return null
                 })()}
 
-                {/* LOGIC: Cut & Polish "Finished vs Unfinished" Intelligence */}
+                {/* Cut & Polish Finished vs Needs Burn Separation */}
                 {(() => {
                     const gasBurnLog = logs?.find(l => l.stage === 'GAS_BURN' && l.data?.breakdown)
                     if (gasBurnLog && (lot.current_stage === 'CUT_POLISH' || lot.current_stage === 'ELECTRIC_BURN')) {
                         const sourceKeys = Object.keys(initialComposition)
-
-                        // Use currentComposition to get the LIVE weights (sync with Report/Analysis)
                         const finished: any[] = []
                         const needsBurn: any[] = []
 
                         Object.entries(currentComposition).forEach(([key, stats]) => {
-                            // Check if it's a source type (remainder)
-                            // Note: 'key' is "Color Clarity" or just "Color" for source types
                             const isSource = sourceKeys.includes(key)
-
                             const { pieces, carats } = stats as { pieces: number, carats: number }
 
                             if (isSource) {
@@ -372,54 +453,54 @@ export default async function LotPage({ params }: { params: Promise<{ id: string
 
                         if (finished.length > 0 || needsBurn.length > 0) {
                             return (
-                                <div className="grid md:grid-cols-2 gap-4">
-                                    <div className="md:col-span-2">
-                                        <div className="rounded-lg border bg-card text-card-foreground shadow-sm">
-                                            <div className="flex flex-col space-y-1.5 p-6">
-                                                <h3 className="font-semibold leading-none tracking-tight">Processing Status (Post Gas Burn)</h3>
-                                                <p className="text-sm text-muted-foreground">Stones separated by color transformation response.</p>
+                                <div className="obsidian-card rounded-2xl p-6 border border-white/5 space-y-4">
+                                    <div>
+                                        <h3 className="font-serif font-bold text-base text-white">
+                                            Processing Status (Post Gas Burn)
+                                        </h3>
+                                        <p className="text-xs text-slate-400">
+                                            Stones separated by color transformation response.
+                                        </p>
+                                    </div>
+                                    <div className="grid sm:grid-cols-2 gap-4">
+                                        <div className="space-y-3 bg-white/[0.02] border border-white/5 rounded-xl p-4">
+                                            <div className="flex items-center gap-2 text-emerald-400 font-semibold text-xs">
+                                                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                                                Finished Transformation (Ready to Sell)
                                             </div>
-                                            <div className="p-6 pt-0 grid md:grid-cols-2 gap-6">
-                                                <div className="space-y-4">
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="h-3 w-3 rounded-full bg-green-500" />
-                                                        <h4 className="font-medium text-sm">Finished Transformation (Ready to Sell)</h4>
-                                                    </div>
-                                                    {finished.length > 0 ? (
-                                                        <div className="space-y-2">
-                                                            {finished.map((item: any, idx: number) => (
-                                                                <div key={idx} className="text-sm border p-2 rounded bg-green-50/50 flex justify-between">
-                                                                    <span>{item.name}</span>
-                                                                    <span className="font-mono text-muted-foreground">{item.carats.toFixed(2)} ct</span>
-                                                                </div>
-                                                            ))}
-                                                            <div className="text-xs text-muted-foreground text-right border-t pt-2 mt-2">
-                                                                Total: {finished.reduce((a: number, b: any) => a + b.carats, 0).toFixed(2)} ct
-                                                            </div>
+                                            {finished.length > 0 ? (
+                                                <div className="space-y-2">
+                                                    {finished.map((item: any, idx: number) => (
+                                                        <div key={idx} className="text-xs border border-white/5 p-2 rounded-lg bg-emerald-500/5 flex justify-between font-mono">
+                                                            <span className="text-slate-200">{item.name}</span>
+                                                            <span className="text-emerald-400 font-bold">{item.carats.toFixed(2)} ct</span>
                                                         </div>
-                                                    ) : <div className="text-sm text-muted-foreground italic">No finished stones.</div>}
+                                                    ))}
+                                                    <div className="text-[11px] text-slate-400 text-right border-t border-white/5 pt-2 font-mono">
+                                                        Total: {finished.reduce((a: number, b: any) => a + b.carats, 0).toFixed(2)} ct
+                                                    </div>
                                                 </div>
+                                            ) : <div className="text-xs text-slate-500 italic">No finished stones yet.</div>}
+                                        </div>
 
-                                                <div className="space-y-4">
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="h-3 w-3 rounded-full bg-orange-500" />
-                                                        <h4 className="font-medium text-sm">Needs Electric Burn</h4>
-                                                    </div>
-                                                    {needsBurn.length > 0 ? (
-                                                        <div className="space-y-2">
-                                                            {needsBurn.map((item: any, idx: number) => (
-                                                                <div key={idx} className="text-sm border p-2 rounded bg-orange-50/50 flex justify-between">
-                                                                    <span>{item.name}</span>
-                                                                    <span className="font-mono text-muted-foreground">{item.carats.toFixed(2)} ct</span>
-                                                                </div>
-                                                            ))}
-                                                            <div className="text-xs text-muted-foreground text-right border-t pt-2 mt-2">
-                                                                Total: {needsBurn.reduce((a: number, b: any) => a + b.carats, 0).toFixed(2)} ct
-                                                            </div>
-                                                        </div>
-                                                    ) : <div className="text-sm text-muted-foreground italic">No stones needing burn.</div>}
-                                                </div>
+                                        <div className="space-y-3 bg-white/[0.02] border border-white/5 rounded-xl p-4">
+                                            <div className="flex items-center gap-2 text-amber-400 font-semibold text-xs">
+                                                <span className="w-2 h-2 rounded-full bg-amber-400" />
+                                                Needs Electric Burn
                                             </div>
+                                            {needsBurn.length > 0 ? (
+                                                <div className="space-y-2">
+                                                    {needsBurn.map((item: any, idx: number) => (
+                                                        <div key={idx} className="text-xs border border-white/5 p-2 rounded-lg bg-amber-500/5 flex justify-between font-mono">
+                                                            <span className="text-slate-200">{item.name}</span>
+                                                            <span className="text-amber-400 font-bold">{item.carats.toFixed(2)} ct</span>
+                                                        </div>
+                                                    ))}
+                                                    <div className="text-[11px] text-slate-400 text-right border-t border-white/5 pt-2 font-mono">
+                                                        Total: {needsBurn.reduce((a: number, b: any) => a + b.carats, 0).toFixed(2)} ct
+                                                    </div>
+                                                </div>
+                                            ) : <div className="text-xs text-slate-500 italic">No stones needing electric burn.</div>}
                                         </div>
                                     </div>
                                 </div>
@@ -429,17 +510,64 @@ export default async function LotPage({ params }: { params: Promise<{ id: string
                     return null
                 })()}
 
-                {/* Composition Details (Initial vs Current) */}
-                <div className="grid md:grid-cols-1 gap-4">
+                {/* 9. MINERAL COMPOSITION DISPLAY */}
+                <section aria-label="Mineral Composition Analysis">
                     <LotCompositionDisplay
                         composition={initialComposition}
                         currentComposition={currentComposition}
                     />
-                </div>
+                </section>
 
-                {/* Timeline */}
-                <StageTimeline currentStage={lot.current_stage} logs={logs || []} isFinalized={lot.is_finalized} purchaseDate={lot.purchase_date} />
+                {/* 10. CHRONOLOGICAL CRAFT TIMELINE */}
+                <section aria-label="Chronological Craft Ledger">
+                    <StageTimeline 
+                        currentStage={lot.current_stage} 
+                        logs={logs || []} 
+                        isFinalized={lot.is_finalized} 
+                        purchaseDate={lot.purchase_date} 
+                    />
+                </section>
+
+                {/* 11. GENUINE MEDIA ASSETS GALLERY */}
+                {assets && assets.length > 0 && (
+                    <section aria-label="Uploaded Media Assets" className="obsidian-card rounded-2xl p-6 border border-white/5">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-2">
+                                <Camera className="w-4 h-4 text-blue-400" />
+                                <h2 className="font-serif font-bold text-base text-white">
+                                    Archived Media Assets ({assets.length})
+                                </h2>
+                            </div>
+                            <span className="text-[10px] font-mono text-slate-400">
+                                SUPABASE EVIDENCE STORAGE
+                            </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                            {assets.map((asset) => (
+                                <div key={asset.id} className="bg-white/[0.02] border border-white/5 rounded-xl p-2 group hover:border-white/20 transition-all">
+                                    <div className="relative h-40 w-full rounded-lg overflow-hidden bg-slate-900 flex items-center justify-center">
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img
+                                            src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/lot-evidence/${asset.file_path}`}
+                                            alt={`Asset ${asset.file_path}`}
+                                            className="h-full w-full object-cover group-hover:scale-105 transition-transform"
+                                        />
+                                    </div>
+                                    <div className="p-2">
+                                        <span className="text-[10px] text-slate-400 font-mono truncate block">
+                                            {asset.file_path.split('/').pop()}
+                                        </span>
+                                        <span className="text-[9px] text-slate-500 font-mono block">
+                                            {new Date(asset.created_at).toLocaleDateString()}
+                                        </span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </section>
+                )}
             </div>
-        </div>
+        </VaultShell>
     )
 }

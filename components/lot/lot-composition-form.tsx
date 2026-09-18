@@ -3,18 +3,18 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2, Layers, Sparkles } from 'lucide-react'
 
-// Default types to start with (but user can edit/add more)
+// Default gem types for Ceylon Corundum procurement
 const DEFAULT_TYPES = [
     'Silky Geuda',
     'Milky Geuda',
     'Young Geuda',
     'Dum Geuda',
-    'Yellow',
-    'Pink',
-    'Non Shape / Other',
-    'Blue Shape'
+    'Yellow Sapphire',
+    'Pink Sapphire',
+    'Blue Shape Rough',
+    'Non Shape / Corundum'
 ]
 
 export function LotCompositionForm({ name }: { name: string }) {
@@ -40,75 +40,106 @@ export function LotCompositionForm({ name }: { name: string }) {
         setRows(rows.filter((_, i) => i !== index))
     }
 
+    const totalPieces = rows.reduce((acc, row) => acc + (Number(row.pieces) || 0), 0)
+    const totalCarats = rows.reduce((acc, row) => acc + (Number(row.carats) || 0), 0)
+
     return (
-        <div className="border rounded-md p-4 bg-muted/20">
-            <h3 className="font-semibold mb-2">Rough Composition</h3>
-            <div className="hidden md:grid grid-cols-12 gap-2 text-sm font-medium text-muted-foreground mb-2">
-                <div className="col-span-5">Type</div>
+        <div className="border border-white/5 rounded-2xl p-5 bg-white/[0.02]">
+            <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-emerald-400" />
+                    <h3 className="font-serif font-bold text-sm text-white">Rough Mineral Composition Matrix</h3>
+                </div>
+                <span className="text-[10px] font-mono text-slate-400">
+                    OPTIONAL INTAKE BREAKDOWN
+                </span>
+            </div>
+
+            <p className="text-xs text-slate-400 mb-4 font-sans">
+                Specify initial geuda and rough varieties. If left at 0, lot will be tracked as single aggregate parcel.
+            </p>
+
+            <div className="hidden md:grid grid-cols-12 gap-2 text-[11px] font-mono font-semibold uppercase tracking-wider text-slate-400 mb-2 px-2">
+                <div className="col-span-5">Mineral Classification</div>
                 <div className="col-span-3 text-center">Pieces</div>
-                <div className="col-span-3 text-center">Carats</div>
+                <div className="col-span-3 text-center">Carats (ct)</div>
                 <div className="col-span-1"></div>
             </div>
 
-            <div className="space-y-4 md:space-y-2">
+            <div className="space-y-2">
                 {rows.map((row, index) => (
-                    <div key={index} className="flex flex-col md:grid md:grid-cols-12 gap-2 items-start md:items-center p-3 md:p-0 border md:border-none rounded-lg bg-black/20 md:bg-transparent">
+                    <div 
+                        key={index} 
+                        className="flex flex-col md:grid md:grid-cols-12 gap-2 items-start md:items-center p-3 md:p-1.5 border border-white/5 md:border-transparent rounded-xl bg-white/[0.01] hover:bg-white/[0.03] transition-colors"
+                    >
                         <div className="w-full md:col-span-5">
-                            <label className="text-xs text-muted-foreground md:hidden mb-1 block">Type</label>
+                            <label className="text-[10px] uppercase font-mono text-slate-400 md:hidden mb-1 block">Type</label>
                             <Input
-                                placeholder="Gem Type"
+                                placeholder="e.g. Silky Geuda"
                                 value={row.type}
                                 onChange={(e) => updateRow(index, 'type', e.target.value)}
+                                className="h-9 bg-slate-900/50 border-white/10 text-xs text-white placeholder:text-slate-600 focus:border-blue-500/50 rounded-lg"
                             />
                         </div>
                         <div className="flex w-full gap-2 md:contents">
                             <div className="flex-1 md:col-span-3">
-                                <label className="text-xs text-muted-foreground md:hidden mb-1 block text-center">Pieces</label>
+                                <label className="text-[10px] uppercase font-mono text-slate-400 md:hidden mb-1 block text-center">Pieces</label>
                                 <Input
                                     type="number"
                                     min="0"
-                                    className="h-10 text-center w-full"
+                                    className="h-9 text-center w-full bg-slate-900/50 border-white/10 text-xs font-mono text-white placeholder:text-slate-600 focus:border-blue-500/50 rounded-lg"
                                     placeholder="0"
                                     value={row.pieces || ''}
                                     onChange={(e) => updateRow(index, 'pieces', e.target.value)}
                                 />
                             </div>
                             <div className="flex-1 md:col-span-3">
-                                <label className="text-xs text-muted-foreground md:hidden mb-1 block text-center">Carats</label>
+                                <label className="text-[10px] uppercase font-mono text-slate-400 md:hidden mb-1 block text-center">Carats</label>
                                 <Input
                                     type="number"
                                     min="0"
                                     step="0.01"
-                                    className="h-10 text-center w-full"
+                                    className="h-9 text-center w-full bg-slate-900/50 border-white/10 text-xs font-mono text-white placeholder:text-slate-600 focus:border-blue-500/50 rounded-lg"
                                     placeholder="0.00"
                                     value={row.carats || ''}
                                     onChange={(e) => updateRow(index, 'carats', e.target.value)}
                                 />
                             </div>
                         </div>
-                        <div className="w-full md:w-auto md:col-span-1 flex justify-end md:justify-center mt-2 md:mt-0">
+                        <div className="w-full md:w-auto md:col-span-1 flex justify-end md:justify-center mt-1 md:mt-0">
                             <Button
                                 type="button"
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => removeRow(index)}
-                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                className="h-8 w-8 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
                             >
-                                <Trash2 className="h-4 w-4" />
+                                <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                         </div>
                     </div>
                 ))}
             </div>
 
+            {/* Live Tally Bar */}
+            <div className="mt-3 pt-3 border-t border-white/5 flex items-center justify-between text-xs font-mono text-slate-400 px-2">
+                <span>Sum Tally:</span>
+                <div className="flex items-center gap-3">
+                    <span>Pieces: <strong className="text-white">{totalPieces}</strong></span>
+                    <span className="text-slate-600">|</span>
+                    <span>Total Weight: <strong className="text-emerald-400">{totalCarats.toFixed(2)} ct</strong></span>
+                </div>
+            </div>
+
             <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                className="mt-4 w-full dashed border-muted-foreground/50"
+                className="mt-3 w-full border-dashed border-white/10 hover:border-blue-400/40 hover:bg-blue-500/[0.04] text-slate-300 text-xs rounded-xl h-9 transition-all"
                 onClick={addRow}
             >
-                <Plus className="h-4 w-4 mr-2" /> Add Gem Type
+                <Plus className="h-3.5 w-3.5 mr-1.5 text-blue-400" />
+                Add Mineral Variety
             </Button>
 
             {/* Hidden input to submit JSON data */}

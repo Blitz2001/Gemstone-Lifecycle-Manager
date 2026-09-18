@@ -635,13 +635,29 @@ export async function getDashboardLots() {
             })
         }
 
-        // 4. Enrich Lots
+        // 4. Fetch Primary Asset Images
+        const { data: assets } = await supabase
+            .from('lot_assets')
+            .select('lot_id, file_path')
+            .in('lot_id', lotIds)
+
+        const lotImages: Record<string, string> = {}
+        if (assets) {
+            assets.forEach(a => {
+                if (!lotImages[a.lot_id]) {
+                    lotImages[a.lot_id] = a.file_path
+                }
+            })
+        }
+
+        // 5. Enrich Lots
         const enrichedLots = lots.map(lot => {
             const purchaseCost = Number(lot.purchase_price) || 0
             const processingCost = lotCosts[lot.id] || 0
             return {
                 ...lot,
-                total_cost: purchaseCost + processingCost
+                total_cost: purchaseCost + processingCost,
+                primary_image: lotImages[lot.id] || null
             }
         })
 

@@ -1,6 +1,6 @@
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import { Layers, Scale, Sparkles } from 'lucide-react'
 
 interface CompositionItem {
     pieces: number
@@ -37,9 +37,9 @@ export function LotCompositionDisplay({ composition, currentComposition }: LotCo
 
     // Helper for direct numeric diff styling
     const getDiffStyle = (val: number) => {
-        if (Math.abs(val) < 0.001) return "text-muted-foreground"
-        if (val > 0) return "text-emerald-600 dark:text-emerald-400 font-medium"
-        return "text-red-500 font-medium" // Loss
+        if (Math.abs(val) < 0.001) return "text-slate-500 font-mono"
+        if (val > 0) return "text-emerald-400 font-mono font-semibold"
+        return "text-rose-400 font-mono font-semibold" // Loss
     }
 
     const allTypes = Array.from(new Set([
@@ -48,47 +48,54 @@ export function LotCompositionDisplay({ composition, currentComposition }: LotCo
     ])).sort()
 
     return (
-        <Card className="col-span-full">
-            <CardHeader className="pb-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div className="obsidian-card rounded-2xl p-6 border border-white/5 relative overflow-hidden">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-white/5">
+                <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                        <Layers className="w-4 h-4" />
+                    </div>
                     <div>
-                        <CardTitle className="text-base font-semibold">
-                            Composition Analysis {hasComparison ? "(Initial vs Current)" : "(Initial)"}
-                        </CardTitle>
-                        <CardDescription className="text-xs mt-1">
+                        <h3 className="text-base font-bold font-serif text-white">
+                            Mineral Composition Analysis {hasComparison ? "(Initial vs Current Stock)" : "(Intake)"}
+                        </h3>
+                        <p className="text-xs text-slate-400">
                             {hasComparison
                                 ? isTransformed
-                                    ? "Stones categorized across processing stages from initial rough to faceted/treated stock."
+                                    ? "Stones categorized across processing stages from initial rough to faceted stock."
                                     : "Live stone count and carat weight tracking across stages."
                                 : "Initial rough stone composition recorded at procurement."}
-                        </CardDescription>
+                        </p>
                     </div>
-                    {hasComparison && totalCarats > 0 && (
-                        <div className="flex items-center gap-2 self-start sm:self-auto">
-                            <span className="text-xs text-muted-foreground">Recovery Yield:</span>
-                            <Badge variant="outline" className={cn(
-                                "font-mono font-semibold px-2 py-0.5 text-xs",
-                                (currentCarats / totalCarats) >= 0.4
-                                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
-                                    : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
-                            )}>
-                                {((currentCarats / totalCarats) * 100).toFixed(1)}%
-                            </Badge>
-                        </div>
-                    )}
                 </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                <div className="rounded-md border overflow-x-auto">
-                    {/* Header */}
-                    <div className="grid grid-cols-12 gap-2 p-2 border-b bg-muted/50 text-xs font-medium text-muted-foreground min-w-[600px]">
-                        <div className="col-span-4">Stone Type / Classification</div>
-                        <div className="col-span-3 text-right border-l px-2">Initial (Pcs / Cts)</div>
-                        {hasComparison && <div className="col-span-3 text-right border-l px-2">Current (Pcs / Cts)</div>}
-                        {hasComparison && <div className="col-span-2 text-right border-l px-2">Status / Variance</div>}
+
+                {hasComparison && totalCarats > 0 && (
+                    <div className="flex items-center gap-2 self-start sm:self-auto">
+                        <span className="text-xs text-slate-400">Total Retention:</span>
+                        <span className={cn(
+                            "font-mono font-bold px-2.5 py-1 text-xs rounded-full border",
+                            (currentCarats / totalCarats) >= 0.4
+                                ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                                : "bg-amber-500/10 text-amber-300 border-amber-500/30"
+                        )}>
+                            {((currentCarats / totalCarats) * 100).toFixed(1)}% RECOVERED
+                        </span>
+                    </div>
+                )}
+            </div>
+
+            {/* Table */}
+            <div className="mt-5 rounded-xl border border-white/5 overflow-hidden">
+                <div className="overflow-x-auto">
+                    {/* Header Row */}
+                    <div className="grid grid-cols-12 gap-2 p-3 bg-white/[0.03] text-xs font-semibold text-slate-400 min-w-[640px] uppercase font-mono tracking-wider">
+                        <div className="col-span-4">Mineral Classification</div>
+                        <div className="col-span-3 text-right border-l border-white/5 px-2">Initial (Pcs / Cts)</div>
+                        {hasComparison && <div className="col-span-3 text-right border-l border-white/5 px-2">Current Stock</div>}
+                        {hasComparison && <div className="col-span-2 text-right border-l border-white/5 px-2">Kerf Variance</div>}
                     </div>
 
-                    {/* Rows */}
+                    {/* Data Rows */}
                     {allTypes.map(type => {
                         const initial = composition[type] || { pieces: 0, carats: 0 }
                         const current = currentComposition?.[type] || { pieces: 0, carats: 0 }
@@ -98,44 +105,43 @@ export function LotCompositionDisplay({ composition, currentComposition }: LotCo
                         const isYieldProduced = hasComparison && initial.carats === 0 && current.carats > 0
 
                         return (
-                            <div key={type} className="grid grid-cols-12 gap-2 p-2 text-sm border-b last:border-0 hover:bg-muted/10 items-center min-w-[600px]">
-                                <div className="col-span-4 font-medium truncate" title={type}>
-                                    {type}
+                            <div key={type} className="grid grid-cols-12 gap-2 p-3 text-sm border-t border-white/5 hover:bg-white/[0.02] items-center min-w-[640px] transition-colors">
+                                <div className="col-span-4 font-medium text-slate-200 truncate flex items-center gap-2" title={type}>
+                                    <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                                    <span>{type}</span>
                                 </div>
 
-                                {/* Initial Data */}
-                                <div className={`col-span-3 text-right border-l px-2 tabular-nums ${initial.carats === 0 ? 'text-muted-foreground/40' : ''}`}>
-                                    {initial.pieces} / {initial.carats.toFixed(2)}
+                                {/* Initial */}
+                                <div className={`col-span-3 text-right border-l border-white/5 px-2 font-mono ${initial.carats === 0 ? 'text-slate-600' : 'text-slate-300'}`}>
+                                    {initial.pieces} pcs / <strong className="text-white">{initial.carats.toFixed(2)} ct</strong>
                                 </div>
 
-                                {/* Current Data */}
+                                {/* Current */}
                                 {hasComparison && (
-                                    <div className={`col-span-3 text-right border-l px-2 tabular-nums ${current.carats === 0 ? 'text-muted-foreground/40' : ''}`}>
-                                        {current.pieces} / {current.carats.toFixed(2)}
+                                    <div className={`col-span-3 text-right border-l border-white/5 px-2 font-mono ${current.carats === 0 ? 'text-slate-600' : 'text-slate-300'}`}>
+                                        {current.pieces} pcs / <strong className="text-white">{current.carats.toFixed(2)} ct</strong>
                                     </div>
                                 )}
 
-                                {/* Status / Diff Data */}
+                                {/* Status / Diff */}
                                 {hasComparison && (
-                                    <div className="col-span-2 text-right border-l px-2 tabular-nums text-xs">
+                                    <div className="col-span-2 text-right border-l border-white/5 px-2 text-xs">
                                         {isProcessedRough ? (
-                                            <div className="flex items-center justify-end gap-1">
-                                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 font-normal">
-                                                    Processed
-                                                </Badge>
-                                            </div>
+                                            <span className="inline-block text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                                                Processed
+                                            </span>
                                         ) : isYieldProduced ? (
-                                            <div className="flex items-center justify-end gap-1">
-                                                <span className="text-emerald-600 dark:text-emerald-400 font-mono font-medium">
-                                                    +{current.carats.toFixed(2)}
+                                            <div className="flex items-center justify-end gap-1.5">
+                                                <span className="text-emerald-400 font-mono font-bold">
+                                                    +{current.carats.toFixed(2)} ct
                                                 </span>
-                                                <Badge variant="outline" className="text-[10px] px-1 py-0 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 font-normal">
-                                                    Yield
-                                                </Badge>
+                                                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+                                                    Cut
+                                                </span>
                                             </div>
                                         ) : (
                                             <span className={getDiffStyle(diffCts)}>
-                                                {diffCts > 0 ? '+' : ''}{diffCts.toFixed(2)}
+                                                {diffCts > 0 ? '+' : ''}{diffCts.toFixed(2)} ct
                                             </span>
                                         )}
                                     </div>
@@ -145,24 +151,24 @@ export function LotCompositionDisplay({ composition, currentComposition }: LotCo
                     })}
 
                     {/* Totals Row */}
-                    <div className="grid grid-cols-12 gap-2 p-2 bg-muted/20 font-semibold text-sm min-w-[600px] border-t items-center">
-                        <div className="col-span-4">Total</div>
-                        <div className="col-span-3 text-right border-l px-2 tabular-nums">
-                            {totalPieces} / {totalCarats.toFixed(2)}
+                    <div className="grid grid-cols-12 gap-2 p-3 bg-white/[0.04] font-semibold text-sm min-w-[640px] border-t border-white/10 items-center">
+                        <div className="col-span-4 text-white font-serif tracking-wide">Aggregate Total</div>
+                        <div className="col-span-3 text-right border-l border-white/5 px-2 font-mono text-slate-300">
+                            {totalPieces} pcs / <strong className="text-white font-bold">{totalCarats.toFixed(2)} ct</strong>
                         </div>
                         {hasComparison && (
-                            <div className="col-span-3 text-right border-l px-2 tabular-nums">
-                                {currentPieces} / {currentCarats.toFixed(2)}
+                            <div className="col-span-3 text-right border-l border-white/5 px-2 font-mono text-slate-300">
+                                {currentPieces} pcs / <strong className="text-white font-bold">{currentCarats.toFixed(2)} ct</strong>
                             </div>
                         )}
                         {hasComparison && (
-                            <div className="col-span-2 text-right border-l px-2 tabular-nums font-mono text-xs">
+                            <div className="col-span-2 text-right border-l border-white/5 px-2 font-mono text-xs">
                                 {(() => {
                                     const netDiff = currentCarats - totalCarats
                                     return (
                                         <span className={cn(
                                             "font-bold",
-                                            netDiff < 0 ? "text-amber-600 dark:text-amber-400" : netDiff > 0 ? "text-emerald-600" : "text-muted-foreground"
+                                            netDiff < 0 ? "text-amber-400" : netDiff > 0 ? "text-emerald-400" : "text-slate-400"
                                         )}>
                                             {netDiff > 0 ? '+' : ''}{netDiff.toFixed(2)} ct
                                         </span>
@@ -172,45 +178,45 @@ export function LotCompositionDisplay({ composition, currentComposition }: LotCo
                         )}
                     </div>
                 </div>
+            </div>
 
-                {/* Overall Recovery & Material Retention Summary Card */}
-                {hasComparison && totalCarats > 0 && (
-                    <div className="p-3.5 rounded-lg bg-muted/30 border space-y-2.5">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
-                            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                                Overall Material Retention
+            {/* Retention Bar at bottom */}
+            {hasComparison && totalCarats > 0 && (
+                <div className="mt-4 p-4 rounded-xl bg-white/[0.02] border border-white/5 space-y-2">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-xs">
+                        <span className="font-semibold uppercase tracking-wider text-slate-400 font-mono">
+                            Material Kerf &amp; Retention Diagnostic
+                        </span>
+                        <div className="flex items-center gap-2 font-mono text-slate-300">
+                            <span>Yield:</span>
+                            <span className="font-bold text-white">
+                                {((currentCarats / totalCarats) * 100).toFixed(1)}%
                             </span>
-                            <div className="flex items-center gap-2">
-                                <span className="text-xs text-muted-foreground">Recovery Rate:</span>
-                                <span className="font-mono font-bold text-sm text-foreground">
-                                    {((currentCarats / totalCarats) * 100).toFixed(1)}%
-                                </span>
-                            </div>
-                        </div>
-
-                        {/* Progress Bar */}
-                        <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                            <div
-                                className={cn(
-                                    "h-full rounded-full transition-all",
-                                    (currentCarats / totalCarats) >= 0.5 ? "bg-emerald-500" : (currentCarats / totalCarats) >= 0.25 ? "bg-amber-500" : "bg-blue-500"
-                                )}
-                                style={{ width: `${Math.min(100, Math.max(0, (currentCarats / totalCarats) * 100))}%` }}
-                            />
-                        </div>
-
-                        <div className="flex justify-between text-[11px] text-muted-foreground font-mono pt-0.5">
-                            <span>Initial Rough: {totalCarats.toFixed(2)} ct ({totalPieces} pcs)</span>
-                            <span>
-                                {currentCarats <= totalCarats
-                                    ? `Cut/Process Variance: ${(totalCarats - currentCarats).toFixed(2)} ct (-${(((totalCarats - currentCarats) / totalCarats) * 100).toFixed(1)}%)`
-                                    : `Net Gain: +${(currentCarats - totalCarats).toFixed(2)} ct`}
+                            <span className="text-slate-600">|</span>
+                            <span>Kerf Loss:</span>
+                            <span className="text-rose-400 font-bold">
+                                {(100 - (currentCarats / totalCarats) * 100).toFixed(1)}%
                             </span>
-                            <span>Current Stock: {currentCarats.toFixed(2)} ct ({currentPieces} pcs)</span>
                         </div>
                     </div>
-                )}
-            </CardContent>
-        </Card>
+
+                    <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden flex">
+                        <div
+                            className="h-full bg-emerald-500 rounded-l-full"
+                            style={{ width: `${Math.min(100, Math.max(0, (currentCarats / totalCarats) * 100))}%` }}
+                        />
+                        <div
+                            className="h-full bg-rose-500 rounded-r-full"
+                            style={{ width: `${Math.max(0, 100 - (currentCarats / totalCarats) * 100)}%` }}
+                        />
+                    </div>
+
+                    <div className="flex justify-between text-[11px] text-slate-400 font-mono pt-1">
+                        <span>Rough Intake: {totalCarats.toFixed(2)} ct ({totalPieces} pcs)</span>
+                        <span>Current Faceted Stock: {currentCarats.toFixed(2)} ct ({currentPieces} pcs)</span>
+                    </div>
+                </div>
+            )}
+        </div>
     )
 }

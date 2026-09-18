@@ -1,47 +1,47 @@
 import { createClient } from '@/lib/supabase/server'
-import { Button } from '@/components/ui/button'
-import { logout } from '@/lib/actions'
-import Link from 'next/link'
 import { PipelineView } from '@/components/dashboard/pipeline-view'
 import { DashboardMetrics } from '@/components/dashboard/dashboard-metrics'
-import { getDashboardMetrics } from '@/lib/actions'
-import { RoiCalculator } from '@/components/tools/roi-calculator'
-import { Plus } from 'lucide-react'
+import { getDashboardMetrics, getDashboardLots } from '@/lib/actions'
+import { VaultShell } from '@/components/layout/vault-shell'
+import { Gem } from 'lucide-react'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
 
-  // Fetch High-Level Metrics
+  // Fetch High-Level Metrics & Lots Count from database
   const metrics = await getDashboardMetrics()
+  const lots = await getDashboardLots()
 
   return (
-    <div className="container mx-auto py-6 space-y-6 h-[calc(100vh-4rem)] flex flex-col">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 flex-shrink-0">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Production Floor</h1>
-          <p className="text-muted-foreground">Manage lot lifecycle and stage transitions</p>
+    <VaultShell activeLotsCount={lots?.length || 0}>
+      <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1600px] mx-auto w-full flex-1 flex flex-col">
+        {/* Executive Title & Subtitle */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2.5 mb-1">
+              <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                <Gem className="w-4 h-4" />
+              </div>
+              <h1 className="text-2xl lg:text-3xl font-bold font-serif text-white tracking-tight">
+                Production Floor
+              </h1>
+            </div>
+            <p className="text-xs text-slate-400 font-sans">
+              Manage gemstone lot lifecycle, processing stages, and financial valuation.
+            </p>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2 items-center w-full md:w-auto">
-          <RoiCalculator />
-          <form action={logout}>
-            <Button variant="ghost" size="sm">Sign Out</Button>
-          </form>
-          <Link href="/lots/new">
-            <Button className="gap-2 bg-blue-600 hover:bg-blue-500">
-              <Plus className="h-4 w-4" />
-              New Lot
-            </Button>
-          </Link>
-        </div>
-      </div>
 
-      <div className="flex-shrink-0">
-        <DashboardMetrics metrics={metrics} />
-      </div>
+        {/* Real 4-Card Bento KPI Grid */}
+        <section aria-label="Portfolio Metrics">
+          <DashboardMetrics metrics={metrics} />
+        </section>
 
-      <div className="flex-1 overflow-hidden min-h-0 bg-background/50 border rounded-xl p-4 shadow-inner">
-        <PipelineView />
+        {/* Real Active Lots Pipeline Ledger */}
+        <section id="active-lots" aria-label="Gemstone Lots Ledger" className="flex-1 flex flex-col min-h-0">
+          <PipelineView />
+        </section>
       </div>
-    </div>
+    </VaultShell>
   )
 }

@@ -1,6 +1,7 @@
 import { LotStage, STAGE_DISPLAY_NAMES } from '@/lib/state-machine'
 import { Card } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
+import { History, ArrowDownRight, ArrowUpRight, Scale, Clock, CheckCircle2 } from 'lucide-react'
 
 interface StageTimelineProps {
     currentStage: string
@@ -91,67 +92,116 @@ export function StageTimeline({ currentStage, logs, isFinalized, purchaseDate }:
     }
 
     return (
-        <Card className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Stage History</h3>
-            <div className="relative border-l border-muted ml-3 space-y-8">
+        <div className="obsidian-card rounded-2xl p-6 border border-white/5 relative overflow-hidden">
+            <div className="flex items-center justify-between mb-6 pb-4 border-b border-white/5">
+                <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+                        <History className="w-4 h-4" />
+                    </div>
+                    <div>
+                        <h3 className="text-base font-bold font-serif text-white">Stage Progression &amp; Audit Trail</h3>
+                        <p className="text-xs text-slate-400">Chronological ledger of physical transformations, kerf yields, and costs</p>
+                    </div>
+                </div>
+                <span className="text-[10px] font-mono text-slate-400 bg-white/[0.03] border border-white/5 px-2.5 py-1 rounded-full">
+                    {logs.length} Recorded Steps
+                </span>
+            </div>
+
+            <div className="relative border-l border-white/10 ml-4 space-y-7">
                 {/* Active Stage Indicator */}
                 <div className="ml-6 relative">
-                    <span className="absolute -left-[31px] top-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary ring-4 ring-background" />
+                    <span className="absolute -left-[31px] top-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500 ring-4 ring-[#080c14] shadow-[0_0_12px_rgba(59,130,246,0.8)]">
+                        <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                    </span>
                     <div className="flex flex-col">
-                        <span className="text-sm font-medium leading-none">{getDisplayName(currentStage)}</span>
-                        <span className="text-xs text-muted-foreground mt-1">
-                            Current Stage
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm font-bold text-white font-serif tracking-wide">
+                                {getDisplayName(currentStage)}
+                            </span>
+                            <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                                ACTIVE STAGE
+                            </span>
+                        </div>
+                        <span className="text-xs text-slate-400 mt-0.5">
+                            Under current custody &amp; processing
                         </span>
                     </div>
                 </div>
 
+                {/* Past Logs */}
                 {processedLogs.map((log) => (
-                    <div key={log.id} className="ml-6 relative">
-                        <span className="absolute -left-[31px] top-1 flex h-4 w-4 items-center justify-center rounded-full bg-muted ring-4 ring-background" />
-                        <div className="flex flex-col gap-1">
-                            <span className="text-sm font-medium leading-none text-muted-foreground">{getDisplayName(log.stage)}</span>
-                            <span className="text-xs text-muted-foreground">
-                                {(log.stage === 'PROCUREMENT' || log.stage === LotStage.PROCUREMENT) && purchaseDate
-                                    ? `Buying Date: ${new Date(purchaseDate).toLocaleDateString(undefined, { dateStyle: 'long' })}`
-                                    : `Completed: ${new Date(log.created_at || log.entered_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}`
-                                }
-                            </span>
-
-                            {/* Stage Output/Yield Display */}
-                            {log.carats > 0 && (
-                                <span className="text-xs font-medium text-foreground">
-                                    Stage Output: <span className="font-semibold font-mono">{log.carats.toFixed(2)} ct</span>
-                                    {log.pieces > 0 && <span className="text-muted-foreground font-normal"> ({log.pieces} {log.pieces === 1 ? 'pc' : 'pcs'})</span>}
+                    <div key={log.id} className="ml-6 relative group">
+                        <span className="absolute -left-[31px] top-1 flex h-4 w-4 items-center justify-center rounded-full bg-slate-800 border border-slate-600 ring-4 ring-[#080c14] group-hover:border-blue-400 transition-colors">
+                            <CheckCircle2 className="w-2.5 h-2.5 text-slate-400 group-hover:text-blue-400" />
+                        </span>
+                        
+                        <div className="bg-white/[0.02] hover:bg-white/[0.04] border border-white/5 hover:border-white/10 p-4 rounded-xl transition-all space-y-2.5">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                                <span className="text-sm font-bold text-slate-200 font-serif">
+                                    {getDisplayName(log.stage)}
                                 </span>
-                            )}
+                                <span className="text-[11px] text-slate-400 font-mono flex items-center gap-1">
+                                    <Clock className="w-3 h-3 text-slate-500" />
+                                    {(log.stage === 'PROCUREMENT' || log.stage === LotStage.PROCUREMENT) && purchaseDate
+                                        ? `Buying Date: ${new Date(purchaseDate).toLocaleDateString(undefined, { dateStyle: 'medium' })}`
+                                        : `${new Date(log.created_at || log.entered_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}`
+                                    }
+                                </span>
+                            </div>
 
-                            {/* Cost Display */}
-                            {log.cost > 0 && (
-                                <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">Cost: LKR {Number(log.cost).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                            )}
+                            {/* Stage Output and Cost Badges */}
+                            <div className="flex flex-wrap items-center gap-3 text-xs">
+                                {log.carats > 0 && (
+                                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-blue-950/40 border border-blue-500/20 text-blue-300 font-mono">
+                                        <Scale className="w-3 h-3 text-blue-400" />
+                                        <span>Output: <strong>{log.carats.toFixed(2)} ct</strong></span>
+                                        {log.pieces > 0 && <span className="text-slate-400">({log.pieces} pcs)</span>}
+                                    </div>
+                                )}
 
-                            {/* Stage Loss/Gain Display */}
+                                {log.cost > 0 && (
+                                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-950/40 border border-emerald-500/20 text-emerald-300 font-mono">
+                                        <span>Stage Cost: <strong>LKR {Number(log.cost).toLocaleString(undefined, { minimumFractionDigits: 0 })}</strong></span>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Stage Delta / Yield Impact */}
                             {log.delta && (
-                                <div className="mt-1 p-2 bg-muted/30 rounded text-xs grid grid-cols-2 gap-x-4 gap-y-1 w-fit border">
-                                    <span className="text-muted-foreground col-span-2 font-medium mb-0.5 border-b pb-0.5">Stage Impact</span>
+                                <div className="mt-2 pt-2 border-t border-white/5 flex flex-wrap items-center gap-4 text-xs font-mono">
+                                    <div className="flex items-center gap-1 text-slate-400">
+                                        <span>Weight Diff:</span>
+                                        <span className={cn(
+                                            "font-bold flex items-center",
+                                            log.delta.carats < 0 ? "text-rose-400" : "text-emerald-400"
+                                        )}>
+                                            {log.delta.carats < 0 ? <ArrowDownRight className="w-3 h-3" /> : <ArrowUpRight className="w-3 h-3" />}
+                                            {log.delta.carats > 0 ? '+' : ''}{log.delta.carats.toFixed(2)} ct
+                                        </span>
+                                    </div>
 
-                                    <span className="text-muted-foreground">Weight:</span>
-                                    <span className={cn("font-mono text-right", log.delta.carats < 0 ? "text-red-500" : "text-green-600")}>
-                                        {log.delta.carats > 0 ? '+' : ''}{log.delta.carats.toFixed(2)} ct
-                                    </span>
-
-                                    <span className="text-muted-foreground">Pieces:</span>
-                                    <span className={cn("font-mono text-right", log.delta.pieces < 0 ? "text-red-500" : "text-green-600")}>
-                                        {log.delta.pieces > 0 ? '+' : ''}{log.delta.pieces}
-                                    </span>
+                                    {log.delta.pieces !== 0 && (
+                                        <div className="flex items-center gap-1 text-slate-400">
+                                            <span>Pieces:</span>
+                                            <span className={log.delta.pieces < 0 ? "text-rose-400" : "text-emerald-400"}>
+                                                {log.delta.pieces > 0 ? '+' : ''}{log.delta.pieces}
+                                            </span>
+                                        </div>
+                                    )}
 
                                     {log.delta.retentionRate !== undefined && (
-                                        <>
-                                            <span className="text-muted-foreground">Retention:</span>
-                                            <span className={cn("font-mono text-right font-medium", log.delta.retentionRate < 100 ? "text-amber-500" : "text-green-600")}>
+                                        <div className="flex items-center gap-1 text-slate-400">
+                                            <span>Yield Retention:</span>
+                                            <span className={cn(
+                                                "font-bold px-1.5 py-0.5 rounded text-[11px]",
+                                                log.delta.retentionRate < 100 
+                                                    ? "bg-amber-500/10 border border-amber-500/20 text-amber-300" 
+                                                    : "bg-emerald-500/10 border border-emerald-500/20 text-emerald-300"
+                                            )}>
                                                 {log.delta.retentionRate}%
                                             </span>
-                                        </>
+                                        </div>
                                     )}
                                 </div>
                             )}
@@ -159,6 +209,6 @@ export function StageTimeline({ currentStage, logs, isFinalized, purchaseDate }:
                     </div>
                 ))}
             </div>
-        </Card>
+        </div>
     )
 }

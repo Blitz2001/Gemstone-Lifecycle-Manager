@@ -100,15 +100,25 @@ export function TransitionControls({ lotId, currentStage, isFinalized, compositi
 
     if (isFinalized) {
         return (
-            <Card className="p-4 bg-muted/50 border-dashed flex justify-between items-center">
-                <div className="flex items-center gap-2 text-muted-foreground p-2">
-                    <span>Lot Finalized. No further transitions allowed.</span>
+            <div className="obsidian-card rounded-2xl p-5 border border-white/5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div className="flex items-center gap-3">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+                    <div>
+                        <span className="text-sm font-bold font-serif text-white">Specimen Lot Closed &amp; Finalized</span>
+                        <p className="text-xs text-slate-400">All lifecycle stages and transactions have been audited and closed.</p>
+                    </div>
                 </div>
-                <Button variant="outline" size="sm" onClick={handleReopen} disabled={loading}>
-                    <LockOpen className="w-4 h-4 mr-2" />
-                    Reopen Lot
+                <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleReopen} 
+                    disabled={loading}
+                    className="bg-white/[0.03] border-white/10 hover:bg-white/10 text-slate-200 text-xs rounded-xl"
+                >
+                    <LockOpen className="w-3.5 h-3.5 mr-1.5 text-amber-400" />
+                    Reopen Lot for Processing
                 </Button>
-            </Card>
+            </div>
         )
     }
 
@@ -276,16 +286,23 @@ export function TransitionControls({ lotId, currentStage, isFinalized, compositi
     }
 
     return (
-        <Card className="p-4 bg-muted/50 border-dashed">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="obsidian-card rounded-2xl p-5 border border-white/5 relative overflow-hidden">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
-                    <h3 className="font-semibold">Workflow Actions</h3>
-                    <p className="text-sm text-muted-foreground">Move to next stage: {STAGE_DISPLAY_NAMES[nextStage]}</p>
+                    <div className="flex items-center gap-2 mb-1">
+                        <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+                        <h3 className="font-serif font-bold text-base text-white">Stage Transition Controller</h3>
+                    </div>
+                    <p className="text-xs text-slate-400">
+                        Target progression: <strong className="text-blue-400">{STAGE_DISPLAY_NAMES[nextStage]}</strong>
+                    </p>
                 </div>
 
                 <Dialog open={isOpen} onOpenChange={setIsOpen}>
                     <DialogTrigger asChild>
-                        <Button>Advance to {STAGE_DISPLAY_NAMES[nextStage]}</Button>
+                        <button className="gold-btn h-10 px-5 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-[0_0_20px_rgba(212,161,55,0.3)]">
+                            <span>Advance to {STAGE_DISPLAY_NAMES[nextStage]}</span>
+                        </button>
                     </DialogTrigger>
                     <DialogContent className="max-w-2xl">
                         <DialogHeader>
@@ -491,15 +508,21 @@ export function TransitionControls({ lotId, currentStage, isFinalized, compositi
 
                         </div>
 
-                        <DialogFooter>
-                            <Button variant="outline" onClick={() => setIsOpen(false)} disabled={loading}>Cancel</Button>
-                            <Button onClick={handleTransition} disabled={loading}>
-                                {loading ? 'Processing...' : 'Confirm Move'}
+                        <DialogFooter className="gap-2 sm:gap-0">
+                            <Button variant="outline" onClick={() => setIsOpen(false)} disabled={loading} className="bg-white/5 border-white/10 text-xs">
+                                Cancel
                             </Button>
+                            <button 
+                                onClick={handleTransition} 
+                                disabled={loading}
+                                className="gold-btn h-10 px-5 rounded-xl text-xs font-semibold flex items-center justify-center gap-2"
+                            >
+                                {loading ? 'Processing...' : '🔒 Commit Progression & Re-Appraise'}
+                            </button>
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>
             </div>
-        </Card>
+        </div>
     )
 }
