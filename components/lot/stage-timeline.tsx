@@ -19,26 +19,44 @@ export function StageTimeline({ currentStage, logs, isFinalized, purchaseDate }:
         let carats = 0
         let pieces = 0
 
-        // Standard Stage Data (measurements map)
-        if (log.data?.measurements) {
+        // 1. Certification Data (verified_carat)
+        if (log.data?.verified_carat !== undefined && log.data?.verified_carat !== null) {
+            carats = Number(log.data.verified_carat) || 0
+            pieces = Number(log.data.verified_pieces) || Number(log.data.pieces) || 0
+        }
+        // 2. Sell Ready Data (valuations array)
+        else if (log.data?.valuations && Array.isArray(log.data.valuations) && log.data.valuations.length > 0) {
+            log.data.valuations.forEach((v: any) => {
+                carats += Number(v.carats) || 0
+                pieces += Number(v.pieces) || 0
+            })
+        }
+        // 3. Electric Burn / Gas Burn Data (breakdown array)
+        else if (log.data?.breakdown && Array.isArray(log.data.breakdown) && log.data.breakdown.length > 0) {
+            log.data.breakdown.forEach((m: any) => {
+                carats += Number(m.carats) || 0
+                pieces += Number(m.pieces) || 0
+            })
+        }
+        // 4. Standard Stage Data (measurements map)
+        else if (log.data?.measurements && Object.keys(log.data.measurements).length > 0) {
             Object.values(log.data.measurements).forEach((m: any) => {
                 carats += Number(m.carats) || 0
                 pieces += Number(m.pieces) || 0
             })
         }
-        // Procurement Data (rough_composition)
-        else if (log.data?.rough_composition) {
+        // 5. Procurement Data (rough_composition)
+        else if (log.data?.rough_composition && Object.keys(log.data.rough_composition).length > 0) {
             Object.values(log.data.rough_composition).forEach((m: any) => {
                 carats += Number(m.carats) || 0
                 pieces += Number(m.pieces) || 0
             })
         }
-        // Electric Burn Data (breakdown array)
-        else if (log.data?.breakdown && Array.isArray(log.data.breakdown)) {
-            log.data.breakdown.forEach((m: any) => {
-                carats += Number(m.carats) || 0
-                pieces += Number(m.pieces) || 0
-            })
+
+        // 6. Direct new_weight fallback
+        if (carats === 0 && log.data?.new_weight) {
+            carats = Number(log.data.new_weight) || 0
+            pieces = Number(log.data?.pieces) || 0
         }
 
         return { carats, pieces }
@@ -53,9 +71,13 @@ export function StageTimeline({ currentStage, logs, isFinalized, purchaseDate }:
             const prevMetrics = getLogMetrics(chronologicalLogs[index - 1])
             // Only calculate delta if strict positive metrics exist to avoid noise
             if (prevMetrics.carats > 0 && metrics.carats > 0) {
+                const caratsDelta = metrics.carats - prevMetrics.carats
+                const piecesDelta = metrics.pieces - prevMetrics.pieces
+                const retentionRate = Number(((metrics.carats / prevMetrics.carats) * 100).toFixed(1))
                 delta = {
-                    carats: metrics.carats - prevMetrics.carats,
-                    pieces: metrics.pieces - prevMetrics.pieces
+                    carats: caratsDelta,
+                    pieces: piecesDelta,
+                    retentionRate
                 }
             }
         }
@@ -95,9 +117,17 @@ export function StageTimeline({ currentStage, logs, isFinalized, purchaseDate }:
                                 }
                             </span>
 
+                            {/* Stage Output/Yield Display */}
+                            {log.carats > 0 && (
+                                <span className="text-xs font-medium text-foreground">
+                                    Stage Output: <span className="font-semibold font-mono">{log.carats.toFixed(2)} ct</span>
+                                    {log.pieces > 0 && <span className="text-muted-foreground font-normal"> ({log.pieces} {log.pieces === 1 ? 'pc' : 'pcs'})</span>}
+                                </span>
+                            )}
+
                             {/* Cost Display */}
                             {log.cost > 0 && (
-                                <span className="text-xs text-green-600 font-medium">Cost: LKR {Number(log.cost).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">Cost: LKR {Number(log.cost).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                             )}
 
                             {/* Stage Loss/Gain Display */}
@@ -114,6 +144,15 @@ export function StageTimeline({ currentStage, logs, isFinalized, purchaseDate }:
                                     <span className={cn("font-mono text-right", log.delta.pieces < 0 ? "text-red-500" : "text-green-600")}>
                                         {log.delta.pieces > 0 ? '+' : ''}{log.delta.pieces}
                                     </span>
+
+                                    {log.delta.retentionRate !== undefined && (
+                                        <>
+                                            <span className="text-muted-foreground">Retention:</span>
+                                            <span className={cn("font-mono text-right font-medium", log.delta.retentionRate < 100 ? "text-amber-500" : "text-green-600")}>
+                                                {log.delta.retentionRate}%
+                                            </span>
+                                        </>
+                                    )}
                                 </div>
                             )}
                         </div>

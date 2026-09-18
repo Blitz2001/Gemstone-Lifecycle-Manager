@@ -236,6 +236,7 @@ export default async function LotPage({ params }: { params: Promise<{ id: string
                         lotId={lot.id}
                         stage={lot.current_stage}
                         isFinalized={lot.is_finalized}
+                        isAdmin={isAdmin}
                     />
                 </div>
 
