@@ -695,64 +695,54 @@ export async function getDashboardMetrics() {
         const processingCost = lotCosts[lot.id] || 0
         const totalLotCost = purchaseCost + processingCost
 
-        // 1. Active Investment (Not Finalized)
-        if (!lot.is_finalized) {
-            total_investment += totalLotCost
-        }
-        if (stage === LotStage.SELL_READY) {
-            // Check if finalized (Sold)
-            if (lot.is_finalized) {
-                // Treat as SOLD
-                // Find sale log (stored in SELL_READY log)
-                const soldLog = logs.find(l => l.lot_id === lot.id && normalizeStage(l.stage) === LotStage.SELL_READY)
-                if (soldLog?.data?.sold_price) {
-                    const price = Number(soldLog.data.sold_price) || 0
-                    realized_revenue += price
-
-                    // Profit = Price - Total Cost (Logs + Purchase Price)
-                    const logCost = lotCosts[lot.id] || 0
-                    const purchaseCost = Number(lot.purchase_price) || 0
-                    const totalLotCost = logCost + purchaseCost
-
-                    realized_profit += (price - totalLotCost)
-                }
-            } else {
-                // Treat as Pending Sale (Projected)
-                pending_sales++
-
-                // Find SELL_READY log
-                const sellLog = logs.find(l => l.lot_id === lot.id && normalizeStage(l.stage) === LotStage.SELL_READY)
-
-                // Add Partial Sales Revenue & Profit (if any)
-                if (sellLog?.data?.sales_history && Array.isArray(sellLog.data.sales_history)) {
-                    sellLog.data.sales_history.forEach((sale: any) => {
-                        const salePrice = Number(sale.price) || 0
-                        realized_revenue += salePrice
-                        // Partial profit = sale price (no cost deduction since lot is still active)
-                        // We'll calculate final profit when lot is finalized
-                        // For now, just track revenue
-                    })
-                }
-
-                // Find valuation in logs for projected revenue
-                if (sellLog?.data?.valuations) {
-                    const val = sellLog.data.valuations.reduce((sum: number, v: any) => sum + (Number(v.total_val) || 0), 0)
-                    projected_revenue += val
-                }
-            }
-        } else if (stage === LotStage.SOLD) {
-            // (Strict 'Sold' stage if any exists in legacy data)
-            const soldLog = logs.find(l => l.lot_id === lot.id && normalizeStage(l.stage) === LotStage.SOLD)
-            if (soldLog?.data?.sold_price) {
-                const price = Number(soldLog.data.sold_price) || 0
-
-                // Profit = Price - Total Cost (Logs + Purchase Price)
-                const logCost = lotCosts[lot.id] || 0
-                const purchaseCost = Number(lot.purchase_price) || 0
-                const totalLotCost = logCost + purchaseCost
-
+        if (lot.is_finalized || stage === LotStage.SOLD) {
+            // Closed / Finalized Lot:
+            // Look for sale info in SELL_READY log or legacy SOLD stage log
+            const finalLog = logs.find(l => l.lot_id === lot.id && (normalizeStage(l.stage) === LotStage.SELL_READY || normalizeStage(l.stage) === LotStage.SOLD))
+            if (finalLog?.data?.sold_price) {
+                const price = Number(finalLog.data.sold_price) || 0
                 realized_revenue += price
                 realized_profit += (price - totalLotCost)
+            }
+        } else {
+            // Active Lot (Not Finalized)
+            if (stage === LotStage.SELL_READY) {
+                pending_sales++
+
+                const sellLog = logs.find(l => l.lot_id === lot.id && normalizeStage(l.stage) === LotStage.SELL_READY)
+                const valuations: any[] = sellLog?.data?.valuations || []
+                const salesHistory: any[] = sellLog?.data?.sales_history || []
+
+                // Active projected revenue from remaining valuations
+                if (valuations.length > 0) {
+                    const val = valuations.reduce((sum: number, v: any) => sum + (Number(v.total_val) || 0), 0)
+                    projected_revenue += val
+                }
+
+                if (salesHistory.length > 0) {
+                    // Proportional Cost Allocation (COGS)
+                    const remainingCarats = valuations.reduce((sum: number, v: any) => sum + (Number(v.carats) || 0), 0)
+                    const soldCaratsTotal = salesHistory.reduce((sum: number, s: any) => sum + (Number(s.sold_carats) || 0), 0)
+                    const totalSellReadyCarats = remainingCarats + soldCaratsTotal
+
+                    const soldPortionRatio = totalSellReadyCarats > 0 ? (soldCaratsTotal / totalSellReadyCarats) : 0
+                    const soldPortionCost = totalLotCost * soldPortionRatio
+                    const remainingActiveCost = totalLotCost - soldPortionCost
+
+                    // Active investment accounts for the unsold inventory only
+                    total_investment += remainingActiveCost
+
+                    // Sales revenue and net realized profit on the sold portion
+                    const lotPartialRevenue = salesHistory.reduce((sum: number, s: any) => sum + (Number(s.price) || 0), 0)
+                    realized_revenue += lotPartialRevenue
+                    realized_profit += (lotPartialRevenue - soldPortionCost)
+                } else {
+                    // No sales yet: full lot cost is in active investment
+                    total_investment += totalLotCost
+                }
+            } else {
+                // Active pre-sale stages (Procurement, Gas Burn, Cut/Polish, Electric Burn, Certification)
+                total_investment += totalLotCost
             }
         }
     })
@@ -781,16 +771,35 @@ export async function deleteLot(lotId: string) {
         const { createAdminClient } = await import('@/lib/supabase/admin')
         const supabase = createAdminClient()
 
-        // 1. Delete associated lot assets
+        // 1. Fetch and purge associated files from Supabase Storage
+        const { data: assets } = await supabase
+            .from('lot_assets')
+            .select('file_path')
+            .eq('lot_id', lotId)
+
+        if (assets && assets.length > 0) {
+            const filePaths = assets.map(a => a.file_path).filter(Boolean)
+            if (filePaths.length > 0) {
+                const { error: storageError } = await supabase.storage
+                    .from('lot-evidence')
+                    .remove(filePaths)
+
+                if (storageError) {
+                    console.error('Storage Removal Warning on Lot Deletion:', storageError)
+                }
+            }
+        }
+
+        // 2. Delete associated lot assets
         await supabase.from('lot_assets').delete().eq('lot_id', lotId)
 
-        // 2. Delete associated processing costs
+        // 3. Delete associated processing costs
         await supabase.from('processing_costs').delete().eq('lot_id', lotId)
 
-        // 3. Delete associated stage logs
+        // 4. Delete associated stage logs
         await supabase.from('stage_logs').delete().eq('lot_id', lotId)
 
-        // 4. Delete the lot record itself
+        // 5. Delete the lot record itself
         const { error } = await supabase.from('lots').delete().eq('id', lotId)
 
         if (error) {
@@ -804,6 +813,48 @@ export async function deleteLot(lotId: string) {
     } catch (error: any) {
         console.error('Delete Lot System Error:', error)
         return { success: false, error: `System Error: ${error.message}` }
+    }
+}
+
+/**
+ * Deletes a single lot evidence asset from both Storage and Database.
+ * Requires Admin privileges.
+ */
+export async function deleteLotAsset(assetId: string, lotId: string, filePath: string) {
+    const adminCheck = await requireAdmin()
+    if (!adminCheck.success) {
+        return adminCheck
+    }
+
+    try {
+        const { createAdminClient } = await import('@/lib/supabase/admin')
+        const supabase = createAdminClient()
+
+        // 1. Remove file from Supabase Storage
+        if (filePath) {
+            const { error: storageError } = await supabase.storage
+                .from('lot-evidence')
+                .remove([filePath])
+
+            if (storageError) {
+                console.error('Storage File Delete Warning:', storageError)
+            }
+        }
+
+        // 2. Remove row from Database
+        const { error: dbError } = await supabase
+            .from('lot_assets')
+            .delete()
+            .eq('id', assetId)
+
+        if (dbError) {
+            return { success: false, error: dbError.message }
+        }
+
+        revalidatePath(`/lots/${lotId}`)
+        return { success: true }
+    } catch (error: any) {
+        return { success: false, error: error.message }
     }
 }
 

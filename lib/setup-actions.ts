@@ -2,8 +2,15 @@
 
 import { createAdminClient } from '@/lib/supabase/admin'
 
+function ensureDevEnvironment() {
+    if (process.env.NODE_ENV === 'production') {
+        throw new Error('Dev setup actions are strictly disabled in production.')
+    }
+}
+
 export async function createProfileForce(userId: string, email: string) {
     try {
+        ensureDevEnvironment()
         const supabase = createAdminClient()
 
         // Upsert profile to ensure it exists
@@ -26,6 +33,7 @@ export async function createProfileForce(userId: string, email: string) {
 
 export async function createDevUserForce() {
     try {
+        ensureDevEnvironment()
         const supabase = createAdminClient()
         const email = 'dev@gemstone.com'
         const password = 'devpassword123'
@@ -59,6 +67,7 @@ export async function createDevUserForce() {
 
 export async function createStorageBucket() {
     try {
+        ensureDevEnvironment()
         const supabase = createAdminClient()
 
         // Create bucket

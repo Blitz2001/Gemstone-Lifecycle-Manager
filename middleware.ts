@@ -8,6 +8,11 @@ export async function middleware(request: NextRequest) {
         },
     })
 
+    // Block development-only bootstrapping endpoints in production
+    if (process.env.NODE_ENV === 'production' && request.nextUrl.pathname.startsWith('/setup_dev_user')) {
+        return new NextResponse('Not Found', { status: 404 })
+    }
+
     const supabase = createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -40,7 +45,6 @@ export async function middleware(request: NextRequest) {
     // effectively all routes except login, auth callback, and public assets
     const isProtectedRoute = !request.nextUrl.pathname.startsWith('/login') &&
         !request.nextUrl.pathname.startsWith('/signup') &&
-        !request.nextUrl.pathname.startsWith('/auth') &&
         !request.nextUrl.pathname.startsWith('/auth') &&
         !request.nextUrl.pathname.startsWith('/_next') &&
         !request.nextUrl.pathname.startsWith('/api') && // Maybe protect API? leaving open for now or specific checks

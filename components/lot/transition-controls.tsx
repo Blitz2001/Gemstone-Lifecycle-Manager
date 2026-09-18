@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { LotStage, ALLOWED_TRANSITIONS, STAGE_DISPLAY_NAMES, normalizeStage } from '@/lib/state-machine'
-import { transitionLotStage, reopenLot, recordPartialSale } from '@/lib/actions'
+import { transitionLotStage, reopenLot } from '@/lib/actions'
 import { Button } from '@/components/ui/button'
 import {
     Dialog,
@@ -20,7 +20,7 @@ import { BreakdownForm } from './forms/breakdown-form'
 import { SellReadyForm } from './forms/sell-ready-form'
 import { SoldForm } from './forms/sold-form'
 import { CertificationForm } from './forms/certification-form'
-import { LockOpen, ShoppingCart } from 'lucide-react'
+import { LockOpen } from 'lucide-react'
 
 interface TransitionControlsProps {
     lotId: string
@@ -37,65 +37,14 @@ export function TransitionControls({ lotId, currentStage, isFinalized, compositi
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [cost, setCost] = useState<string>('')
+    const [costMode, setCostMode] = useState<'per_carat' | 'flat'>('per_carat')
     const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0])
     const [weightInputs, setWeightInputs] = useState<Record<string, string>>({})
     const [piecesInputs, setPiecesInputs] = useState<Record<string, string>>({})
     const [mounted, setMounted] = useState(false)
 
-    // State for Partial Sales
-    const [partialSaleItem, setPartialSaleItem] = useState<any>(null)
-    const [partialSaleQty, setPartialSaleQty] = useState<{ carats: string, pieces: string, price: string, buyer: string, notes: string }>({
-        carats: '', pieces: '', price: '', buyer: '', notes: ''
-    })
-
     // State for Breakdown Data (Gas Burn & Electric Burn)
     const [breakdownData, setBreakdownData] = useState<any>(null)
-
-    // ... (Handlers)
-
-    const handlePartialSale = async () => {
-        if (!partialSaleItem) return
-
-        setLoading(true)
-        setError(null)
-
-        try {
-            const soldCarats = Number(partialSaleQty.carats) || 0
-            const soldPieces = Number(partialSaleQty.pieces) || 0
-            const price = Number(partialSaleQty.price) || 0
-
-            // Validation
-            if (soldPieces > partialSaleItem.pieces || soldCarats > partialSaleItem.carats) {
-                setError("Cannot sell more than available stock.")
-                setLoading(false)
-                return
-            }
-
-            const result = await recordPartialSale(
-                lotId,
-                partialSaleItem.type,
-                soldCarats,
-                soldPieces,
-                price,
-                partialSaleQty.buyer,
-                partialSaleQty.notes,
-                new Date().toISOString()
-            )
-
-            if (!result.success) {
-                setError(result.error || 'Failed to record sale')
-            } else {
-                setIsOpen(false)
-                setPartialSaleItem(null) // Reset
-                // Reset form
-                setPartialSaleQty({ carats: '', pieces: '', price: '', buyer: '', notes: '' })
-            }
-        } catch (err) {
-            setError('An unexpected error occurred')
-        } finally {
-            setLoading(false)
-        }
-    }
 
     // State for Sell Ready / Valuation Data
     const [sellReadyData, setSellReadyData] = useState<any>(null)
@@ -187,7 +136,7 @@ export function TransitionControls({ lotId, currentStage, isFinalized, compositi
 
         let data: any = {}
         let totalNewWeight = 0
-        const costPerCt = Number(cost) || 0
+        const costVal = Number(cost) || 0
 
         if (nextStage === LotStage.GAS_BURN || nextStage === LotStage.ELECTRIC_BURN) {
             // Validate specific form data (Breakdown)
@@ -294,7 +243,10 @@ export function TransitionControls({ lotId, currentStage, isFinalized, compositi
             }
         }
 
-        const finalCost = costPerCt * totalNewWeight
+        const finalCost = costMode === 'flat' ? costVal : costVal * totalNewWeight
+        data.cost_mode = costMode
+        data.cost_rate = costVal
+        data.calculated_stage_cost = finalCost
 
         try {
             const result = await transitionLotStage(lotId, nextStage, data, finalCost, date)
@@ -374,55 +326,88 @@ export function TransitionControls({ lotId, currentStage, isFinalized, compositi
                                 </div>
                             )}
 
-                            {/* NEW: Date and Cost Inputs */}
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="grid grid-cols-4 items-center gap-4">
-                                    <Label htmlFor="date" className="text-right">Date</Label>
+                            {/* Date and Cost Inputs */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-muted/40 p-3 rounded-lg border">
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="date" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                        Effective Date
+                                    </Label>
                                     <Input
                                         id="date"
                                         type="date"
-                                        className="col-span-3"
                                         value={date}
                                         onChange={(e) => setDate(e.target.value)}
                                     />
                                 </div>
-                                <div className="grid grid-cols-4 items-center gap-4">
-                                    <Label htmlFor="cost" className="text-right">Cost<br /><span className="text-xs text-muted-foreground">(/Ct)</span></Label>
-                                    <div className="col-span-3 space-y-1">
-                                        <Input
-                                            id="cost"
-                                            type="number"
-                                            placeholder="0.00"
-                                            value={cost}
-                                            onChange={(e) => setCost(e.target.value)}
-                                        />
-                                        {/* Preview Total Cost */}
-                                        {(() => {
-                                            let estimatedWeight = 0
-                                            if (nextStage === LotStage.GAS_BURN || nextStage === LotStage.ELECTRIC_BURN) {
-                                                const manual = (breakdownData?.breakdown || [])
-                                                    .filter((r: any) => (r.carats || 0) > 0)
-                                                    .reduce((sum: number, r: any) => sum + Number(r.carats), 0)
-                                                estimatedWeight = manual
-                                            } else {
-                                                estimatedWeight = Object.entries(composition || {}).reduce((sum, [type, stats]) => {
-                                                    const cw = weightInputs[type] ? Number(weightInputs[type]) : stats.carats
-                                                    return sum + cw
-                                                }, 0)
-                                            }
-
-                                            const total = (Number(cost) || 0) * estimatedWeight
-
-                                            // Conditional minimal display
-                                            if (!cost) return null
-
-                                            return (
-                                                <div className="text-xs text-right text-muted-foreground leading-tight">
-                                                    Est: {estimatedWeight.toFixed(2)}ct × {cost} = <b>{total.toLocaleString()}</b>
-                                                </div>
-                                            )
-                                        })()}
+                                <div className="space-y-1.5">
+                                    <div className="flex items-center justify-between">
+                                        <Label htmlFor="cost" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                            Stage Cost
+                                        </Label>
+                                        <div className="inline-flex rounded-md border bg-muted/80 p-0.5 text-xs">
+                                            <button
+                                                type="button"
+                                                onClick={() => setCostMode('per_carat')}
+                                                className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
+                                                    costMode === 'per_carat'
+                                                        ? 'bg-primary text-primary-foreground shadow-xs'
+                                                        : 'text-muted-foreground hover:text-foreground'
+                                                }`}
+                                            >
+                                                Rate (/Ct)
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setCostMode('flat')}
+                                                className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
+                                                    costMode === 'flat'
+                                                        ? 'bg-primary text-primary-foreground shadow-xs'
+                                                        : 'text-muted-foreground hover:text-foreground'
+                                                }`}
+                                            >
+                                                Flat Fee
+                                            </button>
+                                        </div>
                                     </div>
+                                    <Input
+                                        id="cost"
+                                        type="number"
+                                        step="any"
+                                        min="0"
+                                        placeholder={costMode === 'flat' ? "e.g. 250.00 (flat total)" : "e.g. 15.00 (/ct rate)"}
+                                        value={cost}
+                                        onChange={(e) => setCost(e.target.value)}
+                                    />
+                                    {/* Preview Total Cost */}
+                                    {(() => {
+                                        const costVal = Number(cost) || 0
+                                        if (!cost || costVal < 0) return null
+
+                                        let estimatedWeight = 0
+                                        if (nextStage === LotStage.GAS_BURN || nextStage === LotStage.ELECTRIC_BURN) {
+                                            const manual = (breakdownData?.breakdown || [])
+                                                .filter((r: any) => (r.carats || 0) > 0)
+                                                .reduce((sum: number, r: any) => sum + Number(r.carats), 0)
+                                            estimatedWeight = manual
+                                        } else {
+                                            estimatedWeight = Object.entries(composition || {}).reduce((sum, [type, stats]) => {
+                                                const cw = weightInputs[type] ? Number(weightInputs[type]) : stats.carats
+                                                return sum + cw
+                                            }, 0)
+                                        }
+
+                                        const total = costMode === 'flat' ? costVal : costVal * estimatedWeight
+
+                                        return (
+                                            <div className="text-xs text-right text-muted-foreground">
+                                                {costMode === 'flat' ? (
+                                                    <span>Fixed Fee: <b>${total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b> (applied directly)</span>
+                                                ) : (
+                                                    <span>Est: {estimatedWeight.toFixed(2)}ct × ${costVal.toFixed(2)} = <b>${total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b></span>
+                                                )}
+                                            </div>
+                                        )
+                                    })()}
                                 </div>
                             </div>
 
