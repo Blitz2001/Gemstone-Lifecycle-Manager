@@ -393,16 +393,22 @@ export async function recordPartialSale(
 
     // Validation
     if (soldPieces > item.pieces || soldCarats > item.carats) {
-        return { success: false, error: 'Insufficient stock.' }
+        return { success: false, error: 'Cannot sell more than available inventory stock.' }
     }
 
-    // Deduct
-    item.pieces -= soldPieces
-    item.carats -= soldCarats
+    // Deduct pieces and carats with precision rounding
+    const remainingPieces = Math.max(0, item.pieces - soldPieces)
+    const remainingCarats = Math.max(0, Math.round((item.carats - soldCarats) * 1000) / 1000)
 
-    // Remove if empty or keep? (Lets remove if pieces 0)
-    if (item.pieces <= 0) {
+    item.pieces = remainingPieces
+    item.carats = remainingCarats
+
+    // Recalculate remaining total_val for this line item or remove if exhausted
+    if (item.pieces <= 0 || item.carats <= 0) {
         valuations.splice(itemIndex, 1)
+    } else {
+        const unitPrice = Number(item.price_per_carat) || 0
+        item.total_val = Math.round(item.carats * unitPrice * 100) / 100
     }
 
     // 3. Record Sale
@@ -434,6 +440,9 @@ export async function recordPartialSale(
         return { success: false, error: updateError.message }
     }
 
+    // Recalculate remaining active weight for the lot
+    const remainingTotalCarats = valuations.reduce((sum: number, v: any) => sum + (Number(v.carats) || 0), 0)
+
     // 5. Check for Auto-Finalization (If inventory empty)
     if (valuations.length === 0) {
         // Calculate Total Revenue from Sales History
@@ -458,6 +467,7 @@ export async function recordPartialSale(
         const { error: finalizeError } = await supabase
             .from('lots')
             .update({
+                current_weight: 0,
                 is_finalized: true,
                 updated_at: new Date().toISOString()
             })
@@ -466,10 +476,19 @@ export async function recordPartialSale(
         if (finalizeError) {
             console.error("Auto-finalization failed:", finalizeError)
         }
+    } else {
+        // Lot still has remaining inventory: update current_weight to reflect remaining carats
+        await supabase
+            .from('lots')
+            .update({
+                current_weight: Math.round(remainingTotalCarats * 1000) / 1000,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', lotId)
     }
 
     revalidatePath(`/lots/${lotId}`)
-    revalidatePath('/dashboard')
+    revalidatePath('/')
     return { success: true }
 }
 

@@ -113,6 +113,17 @@ export default async function LotPage({ params }: { params: Promise<{ id: string
     const valuations = sellReadyLog?.data?.valuations || []
     const salesHistory = sellReadyLog?.data?.sales_history || []
 
+    // In SELL_READY stage, reflect live remaining inventory after any partial sales
+    if (lot.current_stage === 'SELL_READY' && valuations.length > 0) {
+        currentComposition = {}
+        valuations.forEach((item: any) => {
+            currentComposition[item.type] = {
+                carats: Number(item.carats) || 0,
+                pieces: Number(item.pieces) || 0
+            }
+        })
+    }
+
     // 5. Get current user role for RBAC
     const userRole = await getCurrentUserRole()
     const isAdmin = userRole === 'admin'
