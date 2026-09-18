@@ -5,8 +5,7 @@ import { getDashboardLots } from '@/lib/actions'
 import { LotStage, STAGE_DISPLAY_NAMES, STAGE_SEQUENCE, normalizeStage } from '@/lib/state-machine'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Badge } from "@/components/ui/badge"
-import { Loader2, Search, LayoutGrid, List, ArrowUpRight, Gem, Calendar } from 'lucide-react'
+import { Loader2, Search, LayoutGrid, List, ArrowUpRight, Gem, Calendar, ChevronRight } from 'lucide-react'
 import { Input } from "@/components/ui/input"
 import { KanbanBoard } from '@/components/dashboard/kanban-board'
 import { cn } from "@/lib/utils"
@@ -48,7 +47,7 @@ export function PipelineView() {
 
     if (loading) {
         return (
-            <div className="flex h-[40vh] items-center justify-center">
+            <div className="flex h-[35vh] items-center justify-center">
                 <div className="flex flex-col items-center gap-3">
                     <Loader2 className="animate-spin h-7 w-7 text-amber-400" />
                     <span className="text-xs text-slate-400 tracking-wider font-medium font-mono">LOADING LOTS...</span>
@@ -106,18 +105,18 @@ export function PipelineView() {
     }
 
     return (
-        <div className="h-full flex flex-col gap-4">
+        <div className="h-full flex flex-col gap-3 sm:gap-4">
             {/* Top Toolbar: Search, Sort, View Toggle */}
-            <div className="flex flex-col gap-3">
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-                    {/* Search & Sort */}
-                    <div className="flex items-center gap-2.5 flex-1 max-w-lg">
+            <div className="flex flex-col gap-2.5">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+                    {/* Search & Sort Group */}
+                    <div className="flex items-center gap-2 flex-1">
                         <div className="relative flex-1">
-                            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 pointer-events-none" />
                             <Input
                                 type="search"
-                                placeholder="Search by lot code or supplier..."
-                                className="pl-9 bg-slate-900/60 border-white/10 text-white placeholder:text-slate-500 focus:border-amber-500/50 focus:bg-slate-900/90 transition-all h-9 rounded-xl text-xs"
+                                placeholder="Search lot code or supplier..."
+                                className="pl-9 bg-slate-900/60 border-white/10 text-white placeholder:text-slate-500 focus:border-amber-500/50 focus:bg-slate-900/90 transition-all h-10 sm:h-9 rounded-xl text-xs"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                             />
@@ -127,48 +126,48 @@ export function PipelineView() {
                             aria-label="Sort lots"
                             value={sortBy}
                             onChange={(e) => setSortBy(e.target.value as any)}
-                            className="bg-slate-900/60 border border-white/10 text-slate-300 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-amber-500/50 font-sans"
+                            className="bg-slate-900/60 border border-white/10 text-slate-300 rounded-xl px-2.5 sm:px-3 h-10 sm:h-9 text-xs focus:outline-none focus:border-amber-500/50 font-sans shrink-0"
                         >
-                            <option value="newest">Sort: Newest First</option>
-                            <option value="cost_high">Sort: Highest Cost</option>
-                            <option value="weight_high">Sort: Carat Weight</option>
+                            <option value="newest">Newest</option>
+                            <option value="cost_high">Cost High</option>
+                            <option value="weight_high">Weight High</option>
                         </select>
                     </div>
 
                     {/* View Switcher: Table View vs Kanban Board */}
-                    <div className="inline-flex rounded-xl border border-white/10 bg-slate-900/60 p-1 backdrop-blur-sm self-start sm:self-auto">
+                    <div className="inline-flex rounded-xl border border-white/10 bg-slate-900/60 p-1 backdrop-blur-sm self-stretch sm:self-auto justify-center">
                         <button
                             type="button"
                             onClick={() => setViewMode('table')}
                             className={cn(
-                                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all",
+                                "flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all",
                                 viewMode === 'table'
                                     ? "bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-sm"
                                     : "text-slate-400 hover:text-white"
                             )}
                         >
                             <List className="w-3.5 h-3.5" />
-                            Table View
+                            <span>List View</span>
                         </button>
                         <button
                             type="button"
                             onClick={() => setViewMode('kanban')}
                             className={cn(
-                                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all",
+                                "flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all",
                                 viewMode === 'kanban'
                                     ? "bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-sm"
                                     : "text-slate-400 hover:text-white"
                             )}
                         >
                             <LayoutGrid className="w-3.5 h-3.5" />
-                            Kanban Board
+                            <span>Kanban</span>
                         </button>
                     </div>
                 </div>
 
-                {/* Stage Progression Tabs (Table View Only) */}
+                {/* Stage Progression Tabs */}
                 {viewMode === 'table' && (
-                    <div className="flex overflow-x-auto pb-1 gap-2 no-scrollbar border-b border-white/5 pt-1">
+                    <div className="flex overflow-x-auto pb-1 gap-1.5 sm:gap-2 no-scrollbar border-b border-white/5 pt-1 -mx-4 px-4 sm:mx-0 sm:px-0">
                         {COLUMNS.map(stage => {
                             const count = getStageCount(stage)
                             const isActive = activeStage === stage
@@ -179,17 +178,17 @@ export function PipelineView() {
                                     key={stage}
                                     onClick={() => setActiveStage(stage)}
                                     className={cn(
-                                        "flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap border",
+                                        "flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap border shrink-0",
                                         isActive
                                             ? "bg-amber-500/15 border-amber-500/50 text-white shadow-sm shadow-amber-500/10"
-                                            : "bg-slate-900/40 text-slate-400 border-white/5 hover:bg-slate-800/60 hover:text-white hover:border-white/10"
+                                            : "bg-slate-900/40 text-slate-400 border-white/5 hover:bg-slate-800/60 hover:text-white"
                                     )}
                                 >
                                     <span className={cn("w-1.5 h-1.5 rounded-full", isActive ? "bg-amber-400" : colorSpec.dot)} />
                                     <span>{STAGE_DISPLAY_NAMES[stage]}</span>
                                     <span
                                         className={cn(
-                                            "text-[10px] font-bold px-1.5 py-0.5 rounded-md min-w-[1.2rem] text-center font-mono",
+                                            "text-[10px] font-bold px-1.5 py-0.2 rounded-md min-w-[1.1rem] text-center font-mono",
                                             isActive ? "bg-amber-500 text-black" : "bg-white/5 text-slate-400"
                                         )}
                                     >
@@ -208,166 +207,285 @@ export function PipelineView() {
                     <KanbanBoard initialLots={lots} searchQuery={searchQuery} showSearch={false} />
                 </div>
             ) : (
-                /* Rich Specimen Table View */
-                <div className="flex-1 obsidian-card rounded-2xl overflow-hidden shadow-2xl relative flex flex-col">
-                    <div className="overflow-x-auto flex-1">
-                        <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="border-b border-white/5 bg-slate-900/80 text-[10px] uppercase font-bold tracking-wider text-slate-400 sticky top-0 backdrop-blur-md z-10 font-mono">
-                                    <th className="py-3.5 px-4 w-[280px]">Lot Specimen</th>
-                                    <th className="py-3.5 px-4">Stage Status</th>
-                                    <th className="py-3.5 px-4">Supplier &amp; Date</th>
-                                    <th className="py-3.5 px-4">Weight &amp; Yield</th>
-                                    <th className="py-3.5 px-4">Cost Basis</th>
-                                    <th className="py-3.5 px-4 text-right">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-white/5 text-xs">
-                                {currentStageLots.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={6} className="h-48 text-center text-slate-500 py-12">
-                                            <div className="flex flex-col items-center justify-center gap-2">
-                                                <Gem className="w-7 h-7 text-slate-600 mb-1" />
-                                                <p className="font-medium text-slate-400">No lots currently in {STAGE_DISPLAY_NAMES[activeStage]}</p>
-                                                <p className="text-[11px] text-slate-600 max-w-sm">
-                                                    Parcels transitioned to this stage in the production lifecycle will appear here.
-                                                </p>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    currentStageLots.map(lot => {
-                                        const initialWt = Number(lot.initial_weight) || 0
-                                        const currentWt = Number(lot.current_weight) || initialWt
-                                        const yieldRate = initialWt > 0 ? Math.min(100, Math.round((currentWt / initialWt) * 100)) : 100
-                                        const lossRate = 100 - yieldRate
-                                        const stageStyle = STAGE_COLORS[lot.current_stage] || STAGE_COLORS.PROCUREMENT
-                                        const assetUrl = getSupabaseAssetUrl(lot.primary_image)
+                <div className="flex-1 flex flex-col min-h-0">
+                    {/* 1. MOBILE SPECIMEN CARDS VIEW (Visible only on < md screens) */}
+                    <div className="md:hidden space-y-2.5">
+                        {currentStageLots.length === 0 ? (
+                            <div className="obsidian-card rounded-2xl p-8 text-center text-slate-500 flex flex-col items-center gap-2">
+                                <Gem className="w-8 h-8 text-slate-600 mb-1" />
+                                <p className="font-medium text-slate-300 text-sm">No lots in {STAGE_DISPLAY_NAMES[activeStage]}</p>
+                                <p className="text-xs text-slate-500">Parcels in this stage will appear here.</p>
+                            </div>
+                        ) : (
+                            currentStageLots.map(lot => {
+                                const initialWt = Number(lot.initial_weight) || 0
+                                const currentWt = Number(lot.current_weight) || initialWt
+                                const yieldRate = initialWt > 0 ? Math.min(100, Math.round((currentWt / initialWt) * 100)) : 100
+                                const lossRate = 100 - yieldRate
+                                const stageStyle = STAGE_COLORS[lot.current_stage] || STAGE_COLORS.PROCUREMENT
+                                const assetUrl = getSupabaseAssetUrl(lot.primary_image)
 
-                                        return (
-                                            <tr
-                                                key={lot.id}
-                                                className="hover:bg-white/[0.03] transition-colors group cursor-pointer"
-                                            >
-                                                {/* 1. Lot Code & Image */}
-                                                <td className="py-3.5 px-4">
-                                                    <Link href={`/lots/${lot.id}`} className="flex items-center gap-3">
-                                                        <div className="w-10 h-10 rounded-xl bg-slate-800/80 border border-white/10 overflow-hidden flex-shrink-0 flex items-center justify-center relative shadow-inner">
-                                                            {assetUrl ? (
-                                                                <Image
-                                                                    src={assetUrl}
-                                                                    alt={lot.lot_code}
-                                                                    fill
-                                                                    sizes="40px"
-                                                                    className="object-cover"
-                                                                />
-                                                            ) : (
-                                                                <Image
-                                                                    src="/logo.png"
-                                                                    alt="Logo"
-                                                                    width={22}
-                                                                    height={22}
-                                                                    className="opacity-70 group-hover:opacity-100 transition-opacity"
-                                                                />
-                                                            )}
-                                                        </div>
+                                return (
+                                    <Link
+                                        key={lot.id}
+                                        href={`/lots/${lot.id}`}
+                                        className="obsidian-card obsidian-card-hover rounded-2xl p-4 border border-white/5 block relative overflow-hidden group active:scale-[0.99] transition-all"
+                                    >
+                                        {/* Card Top: Thumbnail + Code + Status */}
+                                        <div className="flex items-start justify-between gap-3 mb-3">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-12 h-12 rounded-xl bg-slate-800/80 border border-white/10 overflow-hidden shrink-0 flex items-center justify-center relative shadow-inner">
+                                                    {assetUrl ? (
+                                                        <Image
+                                                            src={assetUrl}
+                                                            alt={lot.lot_code}
+                                                            fill
+                                                            sizes="48px"
+                                                            className="object-cover"
+                                                        />
+                                                    ) : (
+                                                        <Image
+                                                            src="/logo.png"
+                                                            alt="Logo"
+                                                            width={24}
+                                                            height={24}
+                                                            className="opacity-75"
+                                                        />
+                                                    )}
+                                                </div>
 
-                                                        <div className="flex flex-col">
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="font-bold text-white tracking-wide group-hover:text-amber-300 transition-colors font-mono">
-                                                                    {lot.lot_code}
-                                                                </span>
-                                                                {lot.is_finalized && (
-                                                                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 uppercase font-mono">
-                                                                        SEALED
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            <span className="text-[11px] text-slate-400 mt-0.5">
-                                                                {lot.current_pieces ? `${lot.current_pieces} pcs` : 'Single Parcel'}
-                                                            </span>
-                                                        </div>
-                                                    </Link>
-                                                </td>
-
-                                                {/* 2. Stage Status */}
-                                                <td className="py-3.5 px-4">
-                                                    <Link href={`/lots/${lot.id}`}>
-                                                        <span className={cn(
-                                                            "inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full border font-mono",
-                                                            stageStyle.bg,
-                                                            stageStyle.text,
-                                                            stageStyle.border
-                                                        )}>
-                                                            <span className={cn("w-1.5 h-1.5 rounded-full animate-pulse", stageStyle.dot)} />
-                                                            {STAGE_DISPLAY_NAMES[lot.current_stage as LotStage] || lot.current_stage}
+                                                <div>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="font-bold text-white font-mono text-sm tracking-tight group-hover:text-amber-300 transition-colors">
+                                                            {lot.lot_code}
                                                         </span>
-                                                    </Link>
-                                                </td>
-
-                                                {/* 3. Supplier & Date */}
-                                                <td className="py-3.5 px-4">
-                                                    <Link href={`/lots/${lot.id}`} className="flex flex-col">
-                                                        <span className="font-medium text-slate-200">
-                                                            {lot.supplier || 'Unassigned'}
-                                                        </span>
-                                                        <span className="text-[11px] text-slate-400 font-mono flex items-center gap-1 mt-0.5">
-                                                            <Calendar className="w-3 h-3 text-slate-500" />
-                                                            {lot.purchase_date 
-                                                                ? new Date(lot.purchase_date).toLocaleDateString(undefined, { dateStyle: 'medium' })
-                                                                : new Date(lot.created_at).toLocaleDateString(undefined, { dateStyle: 'medium' })}
-                                                        </span>
-                                                    </Link>
-                                                </td>
-
-                                                {/* 4. Weight Retention & Kerf Yield */}
-                                                <td className="py-3.5 px-4">
-                                                    <Link href={`/lots/${lot.id}`} className="block w-44">
-                                                        <div className="flex justify-between text-[11px] mb-1 font-mono">
-                                                            <span className="text-white font-bold">{currentWt.toFixed(2)} ct</span>
-                                                            <span className="text-slate-400">init: {initialWt.toFixed(2)} ct</span>
-                                                        </div>
-                                                        <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden flex">
-                                                            <div className="bg-emerald-500 h-full rounded-l-full" style={{ width: `${yieldRate}%` }} />
-                                                            <div className="bg-rose-500 h-full rounded-r-full" style={{ width: `${lossRate}%` }} />
-                                                        </div>
-                                                        <div className="flex justify-between text-[9px] mt-1 font-semibold font-mono">
-                                                            <span className="text-emerald-400">{yieldRate}% YIELD</span>
-                                                            <span className="text-rose-400">-{lossRate}% LOSS</span>
-                                                        </div>
-                                                    </Link>
-                                                </td>
-
-                                                {/* 5. Cost Basis */}
-                                                <td className="py-3.5 px-4">
-                                                    <Link href={`/lots/${lot.id}`} className="flex flex-col">
-                                                        <span className="font-bold text-white font-serif text-sm">
-                                                            {formatCurrency(Number(lot.total_cost) || Number(lot.purchase_price) || 0)}
-                                                        </span>
-                                                        {lot.purchase_price && (
-                                                            <span className="text-[10px] text-slate-400 font-mono">
-                                                                Rough: {formatCurrency(Number(lot.purchase_price) || 0)}
+                                                        {lot.is_finalized && (
+                                                            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 uppercase font-mono">
+                                                                SEALED
                                                             </span>
                                                         )}
-                                                    </Link>
-                                                </td>
+                                                    </div>
+                                                    <span className="text-xs text-slate-400 block mt-0.5">
+                                                        {lot.supplier || 'Unassigned Supplier'}
+                                                    </span>
+                                                </div>
+                                            </div>
 
-                                                {/* 6. Action */}
-                                                <td className="py-3.5 px-4 text-right">
-                                                    <Link
-                                                        href={`/lots/${lot.id}`}
-                                                        className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-300 hover:text-amber-200 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 px-2.5 py-1.5 rounded-lg transition-all"
-                                                    >
-                                                        Details
-                                                        <ArrowUpRight className="w-3.5 h-3.5" />
-                                                    </Link>
-                                                </td>
-                                            </tr>
-                                        )
-                                    })
-                                )}
-                            </tbody>
-                        </table>
+                                            <div className="flex items-center gap-1">
+                                                <span className={cn(
+                                                    "text-[10px] font-semibold px-2 py-0.5 rounded-full border font-mono",
+                                                    stageStyle.bg,
+                                                    stageStyle.text,
+                                                    stageStyle.border
+                                                )}>
+                                                    {STAGE_DISPLAY_NAMES[lot.current_stage as LotStage] || lot.current_stage}
+                                                </span>
+                                                <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-amber-300 transition-colors ml-1" />
+                                            </div>
+                                        </div>
+
+                                        {/* Weight & Yield Bar */}
+                                        <div className="bg-white/[0.02] border border-white/5 rounded-xl p-2.5 mb-2.5 font-mono text-xs">
+                                            <div className="flex justify-between items-center mb-1 text-[11px]">
+                                                <span className="text-white font-bold">{currentWt.toFixed(2)} ct</span>
+                                                <span className="text-slate-400 text-[10px]">Initial: {initialWt.toFixed(2)} ct</span>
+                                            </div>
+                                            <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden flex">
+                                                <div className="bg-emerald-500 h-full rounded-l-full" style={{ width: `${yieldRate}%` }} />
+                                                <div className="bg-rose-500 h-full rounded-r-full" style={{ width: `${lossRate}%` }} />
+                                            </div>
+                                            <div className="flex justify-between items-center text-[9px] font-semibold mt-1">
+                                                <span className="text-emerald-400">{yieldRate}% RETENTION</span>
+                                                <span className="text-rose-400">-{lossRate}% LOSS</span>
+                                            </div>
+                                        </div>
+
+                                        {/* Card Footer: Cost Basis & Date */}
+                                        <div className="flex items-center justify-between text-xs font-mono pt-1">
+                                            <div>
+                                                <span className="text-[10px] text-slate-500 uppercase block">Total Cost Basis</span>
+                                                <span className="font-bold text-white font-serif text-sm">
+                                                    {formatCurrency(Number(lot.total_cost) || Number(lot.purchase_price) || 0)}
+                                                </span>
+                                            </div>
+
+                                            <div className="text-right">
+                                                <span className="text-[10px] text-slate-500 uppercase block">Acquisition</span>
+                                                <span className="text-slate-300 text-[11px] flex items-center gap-1 justify-end">
+                                                    <Calendar className="w-3 h-3 text-slate-500" />
+                                                    {lot.purchase_date 
+                                                        ? new Date(lot.purchase_date).toLocaleDateString(undefined, { dateStyle: 'short' })
+                                                        : new Date(lot.created_at).toLocaleDateString(undefined, { dateStyle: 'short' })}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </Link>
+                                )
+                            })
+                        )}
+                    </div>
+
+                    {/* 2. DESKTOP SPECIMEN TABLE VIEW (Visible on >= md screens) */}
+                    <div className="hidden md:flex flex-1 obsidian-card rounded-2xl overflow-hidden shadow-2xl relative flex-col">
+                        <div className="overflow-x-auto flex-1">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="border-b border-white/5 bg-slate-900/80 text-[10px] uppercase font-bold tracking-wider text-slate-400 sticky top-0 backdrop-blur-md z-10 font-mono">
+                                        <th className="py-3.5 px-4 w-[280px]">Lot Specimen</th>
+                                        <th className="py-3.5 px-4">Stage Status</th>
+                                        <th className="py-3.5 px-4">Supplier &amp; Date</th>
+                                        <th className="py-3.5 px-4">Weight &amp; Yield</th>
+                                        <th className="py-3.5 px-4">Cost Basis</th>
+                                        <th className="py-3.5 px-4 text-right">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-white/5 text-xs">
+                                    {currentStageLots.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={6} className="h-48 text-center text-slate-500 py-12">
+                                                <div className="flex flex-col items-center justify-center gap-2">
+                                                    <Gem className="w-7 h-7 text-slate-600 mb-1" />
+                                                    <p className="font-medium text-slate-400">No lots currently in {STAGE_DISPLAY_NAMES[activeStage]}</p>
+                                                    <p className="text-[11px] text-slate-600 max-w-sm">
+                                                        Parcels transitioned to this stage in the production lifecycle will appear here.
+                                                    </p>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        currentStageLots.map(lot => {
+                                            const initialWt = Number(lot.initial_weight) || 0
+                                            const currentWt = Number(lot.current_weight) || initialWt
+                                            const yieldRate = initialWt > 0 ? Math.min(100, Math.round((currentWt / initialWt) * 100)) : 100
+                                            const lossRate = 100 - yieldRate
+                                            const stageStyle = STAGE_COLORS[lot.current_stage] || STAGE_COLORS.PROCUREMENT
+                                            const assetUrl = getSupabaseAssetUrl(lot.primary_image)
+
+                                            return (
+                                                <tr
+                                                    key={lot.id}
+                                                    className="hover:bg-white/[0.03] transition-colors group cursor-pointer"
+                                                >
+                                                    {/* 1. Lot Code & Image */}
+                                                    <td className="py-3.5 px-4">
+                                                        <Link href={`/lots/${lot.id}`} className="flex items-center gap-3">
+                                                            <div className="w-10 h-10 rounded-xl bg-slate-800/80 border border-white/10 overflow-hidden flex-shrink-0 flex items-center justify-center relative shadow-inner">
+                                                                {assetUrl ? (
+                                                                    <Image
+                                                                        src={assetUrl}
+                                                                        alt={lot.lot_code}
+                                                                        fill
+                                                                        sizes="40px"
+                                                                        className="object-cover"
+                                                                    />
+                                                                ) : (
+                                                                    <Image
+                                                                        src="/logo.png"
+                                                                        alt="Logo"
+                                                                        width={22}
+                                                                        height={22}
+                                                                        className="opacity-70 group-hover:opacity-100 transition-opacity"
+                                                                    />
+                                                                )}
+                                                            </div>
+
+                                                            <div className="flex flex-col">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="font-bold text-white tracking-wide group-hover:text-amber-300 transition-colors font-mono">
+                                                                        {lot.lot_code}
+                                                                    </span>
+                                                                    {lot.is_finalized && (
+                                                                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 uppercase font-mono">
+                                                                            SEALED
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                <span className="text-[11px] text-slate-400 mt-0.5">
+                                                                    {lot.current_pieces ? `${lot.current_pieces} pcs` : 'Single Parcel'}
+                                                                </span>
+                                                            </div>
+                                                        </Link>
+                                                    </td>
+
+                                                    {/* 2. Stage Status */}
+                                                    <td className="py-3.5 px-4">
+                                                        <Link href={`/lots/${lot.id}`}>
+                                                            <span className={cn(
+                                                                "inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full border font-mono",
+                                                                stageStyle.bg,
+                                                                stageStyle.text,
+                                                                stageStyle.border
+                                                            )}>
+                                                                <span className={cn("w-1.5 h-1.5 rounded-full animate-pulse", stageStyle.dot)} />
+                                                                {STAGE_DISPLAY_NAMES[lot.current_stage as LotStage] || lot.current_stage}
+                                                            </span>
+                                                        </Link>
+                                                    </td>
+
+                                                    {/* 3. Supplier & Date */}
+                                                    <td className="py-3.5 px-4">
+                                                        <Link href={`/lots/${lot.id}`} className="flex flex-col">
+                                                            <span className="font-medium text-slate-200">
+                                                                {lot.supplier || 'Unassigned'}
+                                                            </span>
+                                                            <span className="text-[11px] text-slate-400 font-mono flex items-center gap-1 mt-0.5">
+                                                                <Calendar className="w-3 h-3 text-slate-500" />
+                                                                {lot.purchase_date 
+                                                                    ? new Date(lot.purchase_date).toLocaleDateString(undefined, { dateStyle: 'medium' })
+                                                                    : new Date(lot.created_at).toLocaleDateString(undefined, { dateStyle: 'medium' })}
+                                                            </span>
+                                                        </Link>
+                                                    </td>
+
+                                                    {/* 4. Weight Retention & Kerf Yield */}
+                                                    <td className="py-3.5 px-4">
+                                                        <Link href={`/lots/${lot.id}`} className="block w-44">
+                                                            <div className="flex justify-between text-[11px] mb-1 font-mono">
+                                                                <span className="text-white font-bold">{currentWt.toFixed(2)} ct</span>
+                                                                <span className="text-slate-400">init: {initialWt.toFixed(2)} ct</span>
+                                                            </div>
+                                                            <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden flex">
+                                                                <div className="bg-emerald-500 h-full rounded-l-full" style={{ width: `${yieldRate}%` }} />
+                                                                <div className="bg-rose-500 h-full rounded-r-full" style={{ width: `${lossRate}%` }} />
+                                                            </div>
+                                                            <div className="flex justify-between text-[9px] mt-1 font-semibold font-mono">
+                                                                <span className="text-emerald-400">{yieldRate}% YIELD</span>
+                                                                <span className="text-rose-400">-{lossRate}% LOSS</span>
+                                                            </div>
+                                                        </Link>
+                                                    </td>
+
+                                                    {/* 5. Cost Basis */}
+                                                    <td className="py-3.5 px-4">
+                                                        <Link href={`/lots/${lot.id}`} className="flex flex-col">
+                                                            <span className="font-bold text-white font-serif text-sm">
+                                                                {formatCurrency(Number(lot.total_cost) || Number(lot.purchase_price) || 0)}
+                                                            </span>
+                                                            {lot.purchase_price && (
+                                                                <span className="text-[10px] text-slate-400 font-mono">
+                                                                    Rough: {formatCurrency(Number(lot.purchase_price) || 0)}
+                                                                </span>
+                                                            )}
+                                                        </Link>
+                                                    </td>
+
+                                                    {/* 6. Action */}
+                                                    <td className="py-3.5 px-4 text-right">
+                                                        <Link
+                                                            href={`/lots/${lot.id}`}
+                                                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-300 hover:text-amber-200 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 px-2.5 py-1.5 rounded-lg transition-all"
+                                                        >
+                                                            Details
+                                                            <ArrowUpRight className="w-3.5 h-3.5" />
+                                                        </Link>
+                                                    </td>
+                                                </tr>
+                                            )
+                                        })
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             )}

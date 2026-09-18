@@ -214,20 +214,20 @@ export default async function LotPage({ params }: { params: Promise<{ id: string
                         </div>
 
                         {/* Top Right Financial & Weight Snapshot */}
-                        <div className="flex flex-wrap items-center gap-4 lg:gap-6 font-mono text-xs">
-                            <div className="bg-white/[0.02] border border-white/5 rounded-xl px-4 py-2.5">
+                        <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2.5 sm:gap-4 lg:gap-6 font-mono text-xs w-full lg:w-auto">
+                            <div className="bg-white/[0.02] border border-white/5 rounded-xl p-3 sm:px-4 sm:py-2.5">
                                 <span className="text-[10px] uppercase text-slate-500 block font-semibold">Rough Mass</span>
                                 <span className="text-white font-bold text-sm">{initialWt.toFixed(2)} <span className="text-slate-400 text-xs">ct</span></span>
                             </div>
-                            <div className="bg-white/[0.02] border border-white/5 rounded-xl px-4 py-2.5">
+                            <div className="bg-white/[0.02] border border-white/5 rounded-xl p-3 sm:px-4 sm:py-2.5">
                                 <span className="text-[10px] uppercase text-slate-500 block font-semibold">Current Cut</span>
                                 <span className="text-emerald-400 font-bold text-sm">{currentWt.toFixed(2)} <span className="text-slate-400 text-xs">ct</span></span>
                             </div>
-                            <div className="bg-white/[0.02] border border-white/5 rounded-xl px-4 py-2.5">
+                            <div className="bg-white/[0.02] border border-white/5 rounded-xl p-3 sm:px-4 sm:py-2.5">
                                 <span className="text-[10px] uppercase text-slate-500 block font-semibold">Retention Yield</span>
                                 <span className="text-white font-bold text-sm">{yieldRate}% <span className="text-rose-400 text-xs font-normal">(-{lossRate}%)</span></span>
                             </div>
-                            <div className="bg-white/[0.02] border border-white/5 rounded-xl px-4 py-2.5">
+                            <div className="bg-white/[0.02] border border-white/5 rounded-xl p-3 sm:px-4 sm:py-2.5">
                                 <span className="text-[10px] uppercase text-slate-500 block font-semibold">Total Cost</span>
                                 <span className="text-amber-300 font-bold text-base font-serif">{formatCurrency(totalCost)}</span>
                             </div>
@@ -292,7 +292,7 @@ export default async function LotPage({ params }: { params: Promise<{ id: string
                                 style={{ width: `${lossRate}%` }} 
                             />
                         </div>
-                        <div className="flex justify-between text-[10px] font-mono text-slate-400 pt-0.5">
+                        <div className="flex flex-col sm:flex-row sm:justify-between text-[10px] font-mono text-slate-400 gap-1 pt-0.5">
                             <span className="text-emerald-400">Yield: {currentWt.toFixed(2)} ct ({yieldRate}%)</span>
                             <span className="text-rose-400">Loss: {(initialWt - currentWt).toFixed(2)} ct ({lossRate}%)</span>
                         </div>

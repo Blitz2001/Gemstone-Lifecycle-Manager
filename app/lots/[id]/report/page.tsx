@@ -69,14 +69,14 @@ export default async function LotReportPage({ params }: { params: Promise<{ id: 
 
     return (
         <VaultShell>
-            <div className="p-4 sm:p-6 lg:p-8 max-w-[1400px] mx-auto w-full">
+            <div className="p-3 sm:p-6 lg:p-8 max-w-[1400px] mx-auto w-full">
                 {/* 1. Print & Navigation Controls */}
                 <ReportControls lotId={id} />
 
                 {/* 2. Master Gemological Dossier Document */}
-                <article className="obsidian-card rounded-3xl p-6 sm:p-10 lg:p-12 border border-white/10 shadow-2xl relative overflow-hidden print:bg-white print:text-black print:p-0 print:border-none print:shadow-none">
+                <article className="obsidian-card rounded-2xl sm:rounded-3xl p-4 sm:p-10 lg:p-12 border border-white/10 shadow-2xl relative overflow-hidden print:bg-white print:text-black print:p-0 print:border-none print:shadow-none">
                     {/* Header Crest */}
-                    <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 pb-6 border-b border-white/10 print:border-black/20 relative">
+                    <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-6 pb-6 border-b border-white/10 print:border-black/20 relative">
                         <div className="flex items-center gap-4">
                             <div className="w-14 h-14 rounded-2xl bg-slate-900 border border-amber-500/40 p-2 flex items-center justify-center shadow-[0_0_20px_rgba(212,161,55,0.25)] shrink-0 print:border-black/30">
                                 <Image
@@ -117,7 +117,7 @@ export default async function LotReportPage({ params }: { params: Promise<{ id: 
                             </h2>
                         </div>
 
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs font-mono">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-4 text-xs font-mono">
                             <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5 print:border-black/20 print:bg-transparent">
                                 <span className="text-[10px] text-slate-500 print:text-black block">Supplier / Source</span>
                                 <span className="font-bold text-white print:text-black text-sm">{lot.supplier || 'N/A'}</span>
@@ -214,7 +214,7 @@ export default async function LotReportPage({ params }: { params: Promise<{ id: 
                         </div>
 
                         {/* Financial Totals Reconciliation Grid */}
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 font-mono">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-4 pt-4 font-mono">
                             <div className="bg-white/[0.02] border border-white/5 print:border-black/20 rounded-xl p-4">
                                 <span className="text-[10px] text-slate-500 print:text-black uppercase block font-semibold">Total Cost (Investment)</span>
                                 <div className="text-xl font-bold font-serif text-white print:text-black mt-1">

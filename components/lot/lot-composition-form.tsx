@@ -66,19 +66,19 @@ export function LotCompositionForm({ name }: { name: string }) {
                 <div className="col-span-1"></div>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-2.5">
                 {rows.map((row, index) => (
                     <div 
                         key={index} 
-                        className="flex flex-col md:grid md:grid-cols-12 gap-2 items-start md:items-center p-3 md:p-1.5 border border-white/5 md:border-transparent rounded-xl bg-white/[0.01] hover:bg-white/[0.03] transition-colors"
+                        className="flex flex-col md:grid md:grid-cols-12 gap-2 items-start md:items-center p-3 md:p-1.5 border border-white/5 md:border-transparent rounded-xl bg-white/[0.02] hover:bg-white/[0.03] transition-colors"
                     >
                         <div className="w-full md:col-span-5">
-                            <label className="text-[10px] uppercase font-mono text-slate-400 md:hidden mb-1 block">Type</label>
+                            <label className="text-[10px] uppercase font-mono text-slate-400 md:hidden mb-1 block">Mineral Classification</label>
                             <Input
                                 placeholder="e.g. Silky Geuda"
                                 value={row.type}
                                 onChange={(e) => updateRow(index, 'type', e.target.value)}
-                                className="h-9 bg-slate-900/50 border-white/10 text-xs text-white placeholder:text-slate-600 focus:border-blue-500/50 rounded-lg"
+                                className="h-10 sm:h-9 bg-slate-900/50 border-white/10 text-base sm:text-xs text-white placeholder:text-slate-600 focus:border-amber-500/50 rounded-lg"
                             />
                         </div>
                         <div className="flex w-full gap-2 md:contents">
@@ -87,7 +87,7 @@ export function LotCompositionForm({ name }: { name: string }) {
                                 <Input
                                     type="number"
                                     min="0"
-                                    className="h-9 text-center w-full bg-slate-900/50 border-white/10 text-xs font-mono text-white placeholder:text-slate-600 focus:border-blue-500/50 rounded-lg"
+                                    className="h-10 sm:h-9 text-center w-full bg-slate-900/50 border-white/10 text-base sm:text-xs font-mono text-white placeholder:text-slate-600 focus:border-amber-500/50 rounded-lg"
                                     placeholder="0"
                                     value={row.pieces || ''}
                                     onChange={(e) => updateRow(index, 'pieces', e.target.value)}
@@ -99,30 +99,31 @@ export function LotCompositionForm({ name }: { name: string }) {
                                     type="number"
                                     min="0"
                                     step="0.01"
-                                    className="h-9 text-center w-full bg-slate-900/50 border-white/10 text-xs font-mono text-white placeholder:text-slate-600 focus:border-blue-500/50 rounded-lg"
+                                    className="h-10 sm:h-9 text-center w-full bg-slate-900/50 border-white/10 text-base sm:text-xs font-mono text-white placeholder:text-slate-600 focus:border-amber-500/50 rounded-lg"
                                     placeholder="0.00"
                                     value={row.carats || ''}
                                     onChange={(e) => updateRow(index, 'carats', e.target.value)}
                                 />
                             </div>
-                        </div>
-                        <div className="w-full md:w-auto md:col-span-1 flex justify-end md:justify-center mt-1 md:mt-0">
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => removeRow(index)}
-                                className="h-8 w-8 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
-                            >
-                                <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
+                            <div className="w-auto md:col-span-1 flex items-end md:items-center justify-center pt-5 md:pt-0">
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => removeRow(index)}
+                                    className="h-9 w-9 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+                                    title="Remove row"
+                                >
+                                    <Trash2 className="h-4 w-4" />
+                                </Button>
+                            </div>
                         </div>
                     </div>
                 ))}
             </div>
 
             {/* Live Tally Bar */}
-            <div className="mt-3 pt-3 border-t border-white/5 flex items-center justify-between text-xs font-mono text-slate-400 px-2">
+            <div className="mt-3 pt-3 border-t border-white/5 flex flex-wrap items-center justify-between text-xs font-mono text-slate-400 gap-2 px-2">
                 <span>Sum Tally:</span>
                 <div className="flex items-center gap-3">
                     <span>Pieces: <strong className="text-white">{totalPieces}</strong></span>
@@ -135,10 +136,10 @@ export function LotCompositionForm({ name }: { name: string }) {
                 type="button"
                 variant="outline"
                 size="sm"
-                className="mt-3 w-full border-dashed border-white/10 hover:border-blue-400/40 hover:bg-blue-500/[0.04] text-slate-300 text-xs rounded-xl h-9 transition-all"
+                className="mt-3 w-full border-dashed border-white/10 hover:border-amber-400/40 hover:bg-amber-500/[0.04] text-slate-300 text-xs rounded-xl h-10 transition-all"
                 onClick={addRow}
             >
-                <Plus className="h-3.5 w-3.5 mr-1.5 text-blue-400" />
+                <Plus className="h-3.5 w-3.5 mr-1.5 text-amber-400" />
                 Add Mineral Variety
             </Button>
 

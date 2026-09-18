@@ -300,11 +300,11 @@ export function TransitionControls({ lotId, currentStage, isFinalized, compositi
 
                 <Dialog open={isOpen} onOpenChange={setIsOpen}>
                     <DialogTrigger asChild>
-                        <button className="gold-btn h-10 px-5 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-[0_0_20px_rgba(212,161,55,0.3)]">
+                        <button className="gold-btn h-11 px-5 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(212,161,55,0.3)] w-full sm:w-auto">
                             <span>Advance to {STAGE_DISPLAY_NAMES[nextStage]}</span>
                         </button>
                     </DialogTrigger>
-                    <DialogContent className="max-w-2xl">
+                    <DialogContent className="w-[95vw] sm:w-full max-w-2xl max-h-[85vh] overflow-y-auto p-4 sm:p-6 rounded-2xl">
                         <DialogHeader>
                             <DialogTitle>Confirm Transition</DialogTitle>
                             <DialogDescription>
@@ -319,14 +319,14 @@ export function TransitionControls({ lotId, currentStage, isFinalized, compositi
                             </DialogDescription>
                         </DialogHeader>
 
-                        <div className="grid gap-4 py-4">
+                        <div className="grid gap-4 py-3 sm:py-4">
                             {error && <div className="text-red-500 text-sm">{error}</div>}
 
                             {/* Target Stage Selection (If multiple options exist like Gas Burn -> Cut & Polish OR Electric Burn) */}
                             {nextStages.length > 1 && (
-                                <div className="flex items-center gap-3 bg-muted p-3 rounded-lg border">
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2.5 bg-muted p-3 rounded-xl border">
                                     <Label className="font-semibold text-xs text-muted-foreground uppercase tracking-wider whitespace-nowrap">Target Stage:</Label>
-                                    <div className="flex gap-2">
+                                    <div className="flex flex-wrap gap-2">
                                         {nextStages.map(stage => (
                                             <Button
                                                 key={stage}
@@ -334,7 +334,7 @@ export function TransitionControls({ lotId, currentStage, isFinalized, compositi
                                                 size="sm"
                                                 variant={nextStage === stage ? "default" : "outline"}
                                                 onClick={() => setSelectedTargetStage(stage)}
-                                                className="text-xs"
+                                                className="text-xs h-8"
                                             >
                                                 {STAGE_DISPLAY_NAMES[stage]}
                                             </Button>
@@ -344,7 +344,7 @@ export function TransitionControls({ lotId, currentStage, isFinalized, compositi
                             )}
 
                             {/* Date and Cost Inputs */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-muted/40 p-3 rounded-lg border">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 bg-muted/40 p-3.5 rounded-xl border">
                                 <div className="space-y-1.5">
                                     <Label htmlFor="date" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                                         Effective Date
@@ -354,6 +354,7 @@ export function TransitionControls({ lotId, currentStage, isFinalized, compositi
                                         type="date"
                                         value={date}
                                         onChange={(e) => setDate(e.target.value)}
+                                        className="h-10 text-base sm:text-sm"
                                     />
                                 </div>
                                 <div className="space-y-1.5">

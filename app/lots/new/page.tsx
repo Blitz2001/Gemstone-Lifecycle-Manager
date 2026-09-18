@@ -177,7 +177,7 @@ export default async function NewLotPage() {
                                     name="lot_code" 
                                     placeholder="e.g. LT-2026-001" 
                                     required 
-                                    className="bg-slate-900/60 border-white/10 text-sm font-mono text-white focus:border-amber-500/50 rounded-xl h-10"
+                                    className="bg-slate-900/60 border-white/10 text-base sm:text-sm font-mono text-white focus:border-amber-500/50 rounded-xl h-11 sm:h-10"
                                 />
                             </div>
 
@@ -190,7 +190,7 @@ export default async function NewLotPage() {
                                     name="supplier" 
                                     placeholder="Supplier Name or Concession" 
                                     required 
-                                    className="bg-slate-900/60 border-white/10 text-sm text-white focus:border-amber-500/50 rounded-xl h-10"
+                                    className="bg-slate-900/60 border-white/10 text-base sm:text-sm text-white focus:border-amber-500/50 rounded-xl h-11 sm:h-10"
                                 />
                             </div>
                         </div>
@@ -209,7 +209,7 @@ export default async function NewLotPage() {
                                     step="0.01" 
                                     placeholder="0.00" 
                                     required 
-                                    className="bg-slate-900/60 border-white/10 text-sm font-mono text-white focus:border-amber-500/50 rounded-xl h-10"
+                                    className="bg-slate-900/60 border-white/10 text-base sm:text-sm font-mono text-white focus:border-amber-500/50 rounded-xl h-11 sm:h-10"
                                 />
                             </div>
 
@@ -223,7 +223,7 @@ export default async function NewLotPage() {
                                     type="date" 
                                     defaultValue={new Date().toISOString().split('T')[0]}
                                     required 
-                                    className="bg-slate-900/60 border-white/10 text-sm text-white focus:border-amber-500/50 rounded-xl h-10"
+                                    className="bg-slate-900/60 border-white/10 text-base sm:text-sm text-white focus:border-amber-500/50 rounded-xl h-11 sm:h-10"
                                 />
                             </div>
                         </div>
@@ -241,7 +241,7 @@ export default async function NewLotPage() {
                                 step="0.01" 
                                 placeholder="0.00" 
                                 required 
-                                className="bg-slate-900/60 border-white/10 text-sm font-mono text-white focus:border-amber-500/50 rounded-xl h-10"
+                                className="bg-slate-900/60 border-white/10 text-base sm:text-sm font-mono text-white focus:border-amber-500/50 rounded-xl h-11 sm:h-10"
                             />
                         </div>
 
