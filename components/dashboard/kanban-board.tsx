@@ -12,12 +12,25 @@ import { Input } from "@/components/ui/input"
 // Define columns strictly by sequence
 const COLUMNS = Object.keys(STAGE_SEQUENCE).sort((a, b) => STAGE_SEQUENCE[a as LotStage] - STAGE_SEQUENCE[b as LotStage]) as LotStage[]
 
-export function KanbanBoard() {
-    const [lots, setLots] = useState<any[]>([])
-    const [loading, setLoading] = useState(true)
-    const [searchQuery, setSearchQuery] = useState('')
+interface KanbanBoardProps {
+    initialLots?: any[]
+    searchQuery?: string
+    showSearch?: boolean
+}
+
+export function KanbanBoard({ initialLots, searchQuery: externalSearch, showSearch = true }: KanbanBoardProps = {}) {
+    const [lots, setLots] = useState<any[]>(initialLots || [])
+    const [loading, setLoading] = useState(!initialLots)
+    const [internalSearch, setInternalSearch] = useState('')
+
+    const searchQuery = externalSearch !== undefined ? externalSearch : internalSearch
 
     useEffect(() => {
+        if (initialLots) {
+            setLots(initialLots)
+            setLoading(false)
+            return
+        }
         async function fetchLots() {
             try {
                 const data = await getDashboardLots()
@@ -29,7 +42,7 @@ export function KanbanBoard() {
             }
         }
         fetchLots()
-    }, [])
+    }, [initialLots])
 
     if (loading) {
         return <div className="flex h-[50vh] items-center justify-center"><Loader2 className="animate-spin h-8 w-8 text-white/50" /></div>
@@ -42,17 +55,19 @@ export function KanbanBoard() {
 
     return (
         <div className="h-full flex flex-col gap-4">
-            {/* Search Bar */}
-            <div className="relative w-full max-w-sm">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-white/50" />
-                <Input
-                    type="search"
-                    placeholder="Search Lots..."
-                    className="pl-9 bg-white/5 border-white/10 text-white placeholder:text-white/40 focus:bg-white/10 transition-colors backdrop-blur-sm"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                />
-            </div>
+            {/* Search Bar (if enabled) */}
+            {showSearch && (
+                <div className="relative w-full max-w-sm">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-white/50" />
+                    <Input
+                        type="search"
+                        placeholder="Search Lots..."
+                        className="pl-9 bg-white/5 border-white/10 text-white placeholder:text-white/40 focus:bg-white/10 transition-colors backdrop-blur-sm"
+                        value={internalSearch}
+                        onChange={(e) => setInternalSearch(e.target.value)}
+                    />
+                </div>
+            )}
 
             <div className="flex-1 overflow-y-auto pb-4 pr-2">
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">

@@ -20,6 +20,7 @@ import { PartialSalesHistory } from '@/components/lot/partial-sales-history'
 import { getCurrentUserRole } from '@/lib/auth-utils'
 import { DeleteLotButton } from '@/components/lot/delete-lot-button'
 import { CertificationReport } from '@/components/lot/certification-report'
+import { ElectricBurnReport } from '@/components/lot/electric-burn-report'
 
 export default async function LotPage({ params }: { params: Promise<{ id: string }> }) {
     const supabase = await createClient()
@@ -245,12 +246,13 @@ export default async function LotPage({ params }: { params: Promise<{ id: string
                     </div>
                 )}
 
-                {/* LOGIC: Find Electric Burn Data for Lineage */}
+                {/* LOGIC: Find Electric Burn Data for Report & Lineage */}
                 {(() => {
                     const electricBurnLog = logs?.find(l => l.stage === 'ELECTRIC_BURN' && l.data?.breakdown)
                     if (electricBurnLog) {
                         return (
-                            <div className="grid md:grid-cols-1 gap-4">
+                            <div className="space-y-4">
+                                <ElectricBurnReport lotId={lot.id} stageData={electricBurnLog.data} />
                                 <TransformationLineage breakdown={electricBurnLog.data.breakdown} />
                             </div>
                         )

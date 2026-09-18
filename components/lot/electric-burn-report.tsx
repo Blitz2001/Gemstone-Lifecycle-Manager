@@ -10,18 +10,30 @@ interface ElectricBurnReportProps {
 }
 
 export function ElectricBurnReport({ lotId, stageData }: ElectricBurnReportProps) {
+    const breakdown = (stageData?.breakdown || []).filter((item: any) => (Number(item.carats) || 0) > 0)
 
-    if (!stageData || !stageData.color_distribution) {
+    if (!stageData || (breakdown.length === 0 && !stageData.color_distribution)) {
         return (
             <Card>
                 <CardHeader><CardTitle>Electric Burn Analytics</CardTitle></CardHeader>
-                <CardContent>No data available for report.</CardContent>
+                <CardContent className="text-sm text-muted-foreground">No electric burn result data recorded yet.</CardContent>
             </Card>
         )
     }
 
-    const colors = stageData.color_distribution
-    const clarity = stageData.clarity_distribution
+    const totalCarats = breakdown.reduce((sum: number, item: any) => sum + (Number(item.carats) || 0), 0)
+
+    const colors = stageData.color_distribution || breakdown.reduce((acc: Record<string, number>, item: any) => {
+        const c = item.color || 'Unspecified'
+        acc[c] = (acc[c] || 0) + ((Number(item.carats) || 0) / (totalCarats || 1)) * 100
+        return acc
+    }, {})
+
+    const clarity = stageData.clarity_distribution || breakdown.reduce((acc: Record<string, number>, item: any) => {
+        const cl = item.clarity || 'Unspecified'
+        acc[cl] = (acc[cl] || 0) + ((Number(item.carats) || 0) / (totalCarats || 1)) * 100
+        return acc
+    }, {})
 
     return (
         <Card className="col-span-2">
