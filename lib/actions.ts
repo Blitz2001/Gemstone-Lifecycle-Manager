@@ -11,7 +11,18 @@ import {
 } from '@/lib/state-machine'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { requireAdmin } from '@/lib/auth-utils'
+import { requireAdmin, requireUser } from '@/lib/auth-utils'
+import { buildTransitionTimestamp } from '@/lib/transition-date'
+
+const EVIDENCE_MAX_BYTES = 10 * 1024 * 1024
+const EVIDENCE_MIME_EXTENSIONS: Record<string, string> = {
+    'image/png': 'png',
+    'image/jpeg': 'jpg',
+    'image/webp': 'webp'
+}
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+// Stage is embedded in storage paths, so only allow plain enum-like tokens (no "/" or "..").
+const STORAGE_STAGE_PATTERN = /^[A-Za-z0-9_ ]{1,40}$/
 
 // AUTH ACTIONS
 
@@ -133,22 +144,12 @@ export async function transitionLotStage(
         return { success: false, error: 'Cost cannot be negative' }
     }
 
-    // 5.b Timestamp Generation (Unique)
-    // We merge the Manual Date (if provided) with the Current Time to ensure uniqueness
-    // and preserve ordering, avoiding 'unique_active_stage' violations.
-    let dateObj = new Date()
-    if (transitionDate) {
-        const manualDate = new Date(transitionDate)
-        // Keep the manual Year/Month/Day
-        dateObj.setFullYear(manualDate.getFullYear())
-        dateObj.setMonth(manualDate.getMonth())
-        dateObj.setDate(manualDate.getDate())
-        // Keep current Hours/Min/Sec (preserves entry order on that day)
+    // 5.b Timestamp Generation
+    // Manual date (if provided) + current time of day, so entries on one day keep their order.
+    const timestamp = buildTransitionTimestamp(transitionDate)
+    if (!timestamp) {
+        return { success: false, error: 'Invalid transition date' }
     }
-    // Add random jitter to ms to guarantee uniqueness even during rapid-fire testing
-    dateObj.setMilliseconds(Math.floor(Math.random() * 999))
-
-    const timestamp = dateObj.toISOString()
 
     // 6. PERFORM MUTATION (Pseudo-Transaction via Sequential Writes)
     // Note: Supabase doesn't support true transactions via Client unless using RPC.
@@ -157,38 +158,8 @@ export async function transitionLotStage(
     // However, for this implementation, we will use chained operations which is standard for Supabase JS.
 
     try {
-        const user = (await supabase.auth.getUser()).data.user
-
-        let userId = user?.id
-
-        // DEVELOPMENT FALLBACK: If no active session, find ANY valid user.
-        if (!userId) {
-            // Priority 1: Check Profiles (Public)
-            const { data: profiles } = await supabase.from('profiles').select('id').limit(1)
-
-            if (profiles && profiles.length > 0) {
-                userId = profiles[0].id
-            } else {
-                // Priority 2: Check Auth Users (Admin) - Requires Service Key
-                // This covers cases where User exists but Profile is missing
-                try {
-                    // Dynamic import to avoid circular dep issues or basic context issues
-                    const { createAdminClient } = await import('@/lib/supabase/admin')
-                    const adminClient = createAdminClient()
-                    const { data: { users } } = await adminClient.auth.admin.listUsers({ perPage: 1 })
-
-                    if (users && users.length > 0) {
-                        userId = users[0].id
-                    }
-                } catch (e) {
-                    console.warn("Could not use Admin Client for fallback:", e)
-                }
-            }
-
-            if (!userId) {
-                return { success: false, error: 'DEV ERROR: No users exist in DB. Please Sign Up once to create a valid User ID.' }
-            }
-        }
+        // The acting admin is always the authenticated caller (verified by requireAdmin above)
+        const userId = adminCheck.userId
 
         // SPECIAL CASE: Selling (Finalizing)
         // The DB does not have a 'SOLD' stage enum. Sale data is stored in the SELL_READY log.
@@ -365,6 +336,16 @@ export async function recordPartialSale(
         return adminCheck
     }
 
+    // Input validation: quantities must be real, positive numbers
+    const inputsValid =
+        Number.isFinite(soldCarats) && soldCarats > 0 &&
+        Number.isInteger(soldPieces) && soldPieces > 0 &&
+        Number.isFinite(price) && price >= 0 &&
+        !Number.isNaN(new Date(date).getTime())
+    if (!inputsValid) {
+        return { success: false, error: 'Sale requires positive carats, a whole number of pieces, a non-negative price and a valid date.' }
+    }
+
     const supabase = await createClient()
 
     // 1. Fetch current SELL_READY log
@@ -403,6 +384,15 @@ export async function recordPartialSale(
 
     item.pieces = remainingPieces
     item.carats = remainingCarats
+
+    // Pieces and carats must be exhausted together; otherwise the leftover stock
+    // (and its value) would be silently deleted with the line item.
+    if ((remainingPieces === 0) !== (remainingCarats === 0)) {
+        return {
+            success: false,
+            error: 'Selling all pieces requires selling all carats of this item (and vice versa). Adjust the quantities.'
+        }
+    }
 
     // Recalculate remaining total_val for this line item or remove if exhausted
     if (item.pieces <= 0 || item.carats <= 0) {
@@ -494,12 +484,17 @@ export async function recordPartialSale(
 }
 
 /**
- * Fetches assets for a lot from DB using Admin Client (Bypass RLS)
+ * Fetches assets for a lot. Requires a signed-in user; runs under RLS.
  */
 export async function getLotAssets(lotId: string, stage?: string) {
     try {
-        const { createAdminClient } = await import('@/lib/supabase/admin')
-        const supabase = createAdminClient()
+        const userCheck = await requireUser()
+        if (!userCheck.success) return []
+
+        if (!UUID_PATTERN.test(lotId)) return []
+        if (stage && !STORAGE_STAGE_PATTERN.test(stage)) return []
+
+        const supabase = await createClient()
 
         let query = supabase
             .from('lot_assets')
@@ -507,7 +502,9 @@ export async function getLotAssets(lotId: string, stage?: string) {
             .eq('lot_id', lotId)
 
         if (stage) {
-            query = query.ilike('file_path', `${lotId}/${stage}/%`)
+            // startsWith-style match; escape LIKE wildcards so "_" in stage names is literal
+            const escapedStage = stage.replace(/[\\%_]/g, (c) => `\\${c}`)
+            query = query.like('file_path', `${lotId}/${escapedStage}/%`)
         }
 
         const { data, error } = await query
@@ -525,57 +522,53 @@ export async function getLotAssets(lotId: string, stage?: string) {
 }
 
 /**
- * Registers an asset in the DB using Admin Client (Bypass RLS)
- */
-export async function registerLotAsset(lotId: string, filePath: string, fileType: string) {
-    try {
-        const { createAdminClient } = await import('@/lib/supabase/admin')
-        const supabase = createAdminClient()
-
-        const { error } = await supabase
-            .from('lot_assets')
-            .insert({
-                lot_id: lotId,
-                file_path: filePath,
-                file_type: fileType
-            })
-
-        if (error) {
-            console.error('Asset Registration Error:', error)
-            return { success: false, error: error.message }
-        }
-
-        revalidatePath(`/lots/${lotId}`)
-        return { success: true }
-    } catch (error: any) {
-        return { success: false, error: error.message }
-    }
-}
-
-/**
- * Uploads evidence to Storage AND registers in DB (Bypass RLS)
+ * Uploads evidence to Storage AND registers in DB.
+ * Admin only. Uses the service-role client for the write, so every input is validated here.
  */
 export async function uploadLotEvidence(formData: FormData) {
+    // 0. CHECK: Admin Access
+    const adminCheck = await requireAdmin()
+    if (!adminCheck.success) {
+        return adminCheck
+    }
+
     try {
-        const { createAdminClient } = await import('@/lib/supabase/admin')
-        const supabase = createAdminClient()
+        const file = formData.get('file')
+        const lotId = formData.get('lotId')
+        const stage = formData.get('stage')
 
-        const file = formData.get('file') as File
-        const lotId = formData.get('lotId') as string
-        const stage = formData.get('stage') as string
-
-        if (!file || !lotId || !stage) {
+        if (!(file instanceof File) || typeof lotId !== 'string' || typeof stage !== 'string' || !lotId || !stage) {
             return { success: false, error: 'Missing required fields' }
         }
 
-        const fileExt = file.name.split('.').pop()
-        const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`
+        if (!UUID_PATTERN.test(lotId) || !STORAGE_STAGE_PATTERN.test(stage)) {
+            return { success: false, error: 'Invalid lot or stage' }
+        }
+
+        const fileExt = EVIDENCE_MIME_EXTENSIONS[file.type]
+        if (!fileExt) {
+            return { success: false, error: 'Only PNG, JPEG or WebP images are allowed' }
+        }
+        if (file.size === 0 || file.size > EVIDENCE_MAX_BYTES) {
+            return { success: false, error: 'Image must be between 1 byte and 10MB' }
+        }
+
+        const { createAdminClient } = await import('@/lib/supabase/admin')
+        const supabase = createAdminClient()
+
+        // The lot must exist; never write into a folder for an arbitrary ID
+        const { data: lot } = await supabase.from('lots').select('id').eq('id', lotId).maybeSingle()
+        if (!lot) {
+            return { success: false, error: 'Lot not found' }
+        }
+
+        const fileName = `${crypto.randomUUID()}.${fileExt}`
         const filePath = `${lotId}/${stage}/${fileName}`
 
         // 1. Upload to Storage (Admin)
-        const { data: uploadData, error: uploadError } = await supabase.storage
+        const { error: uploadError } = await supabase.storage
             .from('lot-evidence')
-            .upload(filePath, file)
+            .upload(filePath, file, { contentType: file.type, upsert: false })
 
         if (uploadError) {
             return { success: false, error: `Storage Error: ${uploadError.message}` }
@@ -591,6 +584,8 @@ export async function uploadLotEvidence(formData: FormData) {
             })
 
         if (dbError) {
+            // Don't leave an untracked file behind in storage
+            await supabase.storage.from('lot-evidence').remove([filePath])
             return { success: false, error: `DB Error: ${dbError.message}` }
         }
 
@@ -602,12 +597,14 @@ export async function uploadLotEvidence(formData: FormData) {
 }
 
 /**
- * Fetches all lots for the Kanban Dashboard
+ * Fetches all lots for the Kanban Dashboard. Requires a signed-in user; runs under RLS.
  */
 export async function getDashboardLots() {
     try {
-        const { createAdminClient } = await import('@/lib/supabase/admin')
-        const supabase = createAdminClient()
+        const userCheck = await requireUser()
+        if (!userCheck.success) return []
+
+        const supabase = await createClient()
 
         // 1. Fetch Lots
         const { data: lots, error } = await supabase
@@ -836,7 +833,7 @@ export async function deleteLot(lotId: string) {
  * Deletes a single lot evidence asset from both Storage and Database.
  * Requires Admin privileges.
  */
-export async function deleteLotAsset(assetId: string, lotId: string, filePath: string) {
+export async function deleteLotAsset(assetId: string, lotId: string) {
     const adminCheck = await requireAdmin()
     if (!adminCheck.success) {
         return adminCheck
@@ -846,11 +843,23 @@ export async function deleteLotAsset(assetId: string, lotId: string, filePath: s
         const { createAdminClient } = await import('@/lib/supabase/admin')
         const supabase = createAdminClient()
 
+        // Look up the asset server-side: never trust a client-supplied storage path
+        const { data: asset } = await supabase
+            .from('lot_assets')
+            .select('id, file_path')
+            .eq('id', assetId)
+            .eq('lot_id', lotId)
+            .maybeSingle()
+
+        if (!asset) {
+            return { success: false, error: 'Asset not found' }
+        }
+
         // 1. Remove file from Supabase Storage
-        if (filePath) {
+        if (asset.file_path) {
             const { error: storageError } = await supabase.storage
                 .from('lot-evidence')
-                .remove([filePath])
+                .remove([asset.file_path])
 
             if (storageError) {
                 console.error('Storage File Delete Warning:', storageError)
@@ -861,7 +870,7 @@ export async function deleteLotAsset(assetId: string, lotId: string, filePath: s
         const { error: dbError } = await supabase
             .from('lot_assets')
             .delete()
-            .eq('id', assetId)
+            .eq('id', asset.id)
 
         if (dbError) {
             return { success: false, error: dbError.message }

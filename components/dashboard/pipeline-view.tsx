@@ -100,7 +100,7 @@ export function PipelineView() {
 
     const getSupabaseAssetUrl = (filePath: string | null) => {
         if (!filePath) return null
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://qxxtlytyjkwqyumlxvvv.supabase.co'
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
         return `${supabaseUrl}/storage/v1/object/public/lot-evidence/${filePath}`
     }
 

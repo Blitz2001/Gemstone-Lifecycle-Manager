@@ -58,11 +58,31 @@ export async function isAdmin(): Promise<boolean> {
     return role === 'admin'
 }
 
+export type AuthCheck =
+    | { success: true; userId: string }
+    | { success: false; error: string }
+
 /**
- * Server-side helper to require admin access
- * Throws error if user is not admin
+ * Server-side helper to require an authenticated session.
+ * Must guard every server action, including ones that use the service-role
+ * client: middleware is not a sufficient authorization boundary for actions.
  */
-export async function requireAdmin() {
+export async function requireUser(): Promise<AuthCheck> {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+        return { success: false, error: 'Not authenticated' }
+    }
+
+    return { success: true, userId: user.id }
+}
+
+/**
+ * Server-side helper to require admin access.
+ * Returns a failure result (does not throw) if the user is not an admin.
+ */
+export async function requireAdmin(): Promise<AuthCheck> {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -80,5 +100,5 @@ export async function requireAdmin() {
         return { success: false, error: 'Admin access required. Contact your administrator.' }
     }
 
-    return { success: true }
+    return { success: true, userId: user.id }
 }

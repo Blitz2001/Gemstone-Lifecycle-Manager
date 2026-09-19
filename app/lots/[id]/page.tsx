@@ -14,7 +14,6 @@ import { SaleSummary } from '@/components/lot/sale-summary'
 import { EvidenceUpload } from '@/components/lot/evidence-upload'
 import { extractMetrics } from '@/lib/metrics'
 import { MetricsDisplay } from '@/components/lot/metrics-display'
-import { createStorageBucket } from '@/lib/setup-actions'
 import { PartialSalesManager } from '@/components/lot/partial-sales-manager'
 import { PartialSalesHistory } from '@/components/lot/partial-sales-history'
 import { getCurrentUserRole } from '@/lib/auth-utils'
@@ -36,9 +35,6 @@ import {
 export default async function LotPage({ params }: { params: Promise<{ id: string }> }) {
     const supabase = await createClient()
     const { id } = await params
-
-    // Ensure storage bucket exists
-    await createStorageBucket()
 
     const { data: lot, error: lotError } = await supabase
         .from('lots')

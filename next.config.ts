@@ -1,13 +1,13 @@
 import type { NextConfig } from "next";
 
-// Dynamically extract Supabase hostname from environment variable or fallback to wildcard
+// Extract the Supabase hostname from the environment; the wildcard pattern below is the fallback.
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-let dynamicHostname = 'qxxtlytyjkwqyumlxvvv.supabase.co';
+let dynamicHostname: string | null = null;
 if (supabaseUrl) {
   try {
     dynamicHostname = new URL(supabaseUrl).hostname;
   } catch {
-    // fallback
+    // fall back to the wildcard pattern
   }
 }
 
@@ -16,11 +16,13 @@ const nextConfig: NextConfig = {
   reactCompiler: true,
   images: {
     remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: dynamicHostname,
-        pathname: '/storage/v1/object/public/**',
-      },
+      ...(dynamicHostname
+        ? [{
+            protocol: 'https' as const,
+            hostname: dynamicHostname,
+            pathname: '/storage/v1/object/public/**',
+          }]
+        : []),
       {
         protocol: 'https',
         hostname: '*.supabase.co',

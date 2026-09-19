@@ -175,11 +175,13 @@ export function validateStageData(stage: LotStage, data: any): { valid: boolean;
     return { valid: true };
   } catch (e: any) {
     if (e instanceof z.ZodError) {
-      const errors = (e as any).errors || (e as any).errors; // Try both access patterns
-      if (Array.isArray(errors)) {
-        return { valid: false, error: errors.map((err: any) => `${err.path.join('.')}: ${err.message}`).join(', ') };
-      }
-      return { valid: false, error: e.message };
+      // Zod v4 exposes validation problems as `issues` (`errors` was removed).
+      return {
+        valid: false,
+        error: e.issues
+          .map((issue) => (issue.path.length ? `${issue.path.join('.')}: ${issue.message}` : issue.message))
+          .join(', ')
+      };
     }
     return { valid: false, error: e.message };
   }

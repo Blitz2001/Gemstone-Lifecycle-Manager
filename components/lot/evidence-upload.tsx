@@ -84,7 +84,7 @@ export function EvidenceUpload({ lotId, stage, isFinalized, isAdmin = false }: E
         setDeletingId(asset.id)
 
         try {
-            const result = await deleteLotAsset(asset.id, lotId, asset.file_path)
+            const result = await deleteLotAsset(asset.id, lotId)
             if (!result.success) {
                 throw new Error(result.error || 'Failed to delete photo')
             }

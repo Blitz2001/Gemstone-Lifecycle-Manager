@@ -1,4 +1,3 @@
-import { createClient } from '@/lib/supabase/server'
 import { PipelineView } from '@/components/dashboard/pipeline-view'
 import { DashboardMetrics } from '@/components/dashboard/dashboard-metrics'
 import { getDashboardMetrics, getDashboardLots } from '@/lib/actions'
@@ -6,8 +5,6 @@ import { VaultShell } from '@/components/layout/vault-shell'
 import { Gem } from 'lucide-react'
 
 export default async function DashboardPage() {
-  const supabase = await createClient()
-
   // Fetch High-Level Metrics & Lots Count from database
   const metrics = await getDashboardMetrics()
   const lots = await getDashboardLots()
