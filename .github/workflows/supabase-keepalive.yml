@@ -1,0 +1,41 @@
+name: Supabase keep-alive
+
+# Supabase free-tier projects are paused after 7 days without activity.
+# This job calls a tiny database function once a day to count as activity.
+# If the project is already paused (or the secrets are wrong) the job fails
+# and GitHub emails the repository owner.
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Call keepalive() on Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_ANON_KEY:-}" ]; then
+            echo "SUPABASE_URL and SUPABASE_ANON_KEY repository secrets are required" >&2
+            exit 1
+          fi
+          status=$(curl -sS --max-time 30 -o response.json -w '%{http_code}' \
+            -X POST "${SUPABASE_URL%/}/rest/v1/rpc/keepalive" \
+            -H "apikey: ${SUPABASE_ANON_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
+            -H "Content-Type: application/json" \
+            -d '{}')
+          echo "HTTP ${status}"
+          cat response.json; echo
+          if [ "$status" != "200" ]; then
+            echo "Keep-alive failed" >&2
+            exit 1
+          fi

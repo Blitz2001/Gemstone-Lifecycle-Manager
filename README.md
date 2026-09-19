@@ -81,6 +81,18 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
    - Supabase default email limits rate-limit emails to 3 per hour.
    - In **Authentication** → **Email Templates / SMTP Settings**, connect your transactional mailer (SendGrid, Resend, AWS SES, Postmark).
 
+4. **Free-Tier Keep-Alive (Skip on Pro)**:
+   - Supabase Free projects pause after 7 days of inactivity. `production_schema.sql` creates a `keepalive()` function, and `.github/workflows/supabase-keepalive.yml` calls it daily.
+   - In GitHub → **Settings → Secrets and variables → Actions**, add `SUPABASE_URL` and `SUPABASE_ANON_KEY` (the same values as `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`).
+   - Existing databases: run `supabase/migrations/20260919_add_keepalive.sql` once.
+   - This does not replace backups (below).
+
+5. **Backups (Free Tier Has None)**:
+   - Run `npm run backup` on a trusted machine. It reads `SUPABASE_SERVICE_ROLE_KEY` from `.env.local` and writes every table (row-count verified), the auth user list and a mirror of the `lot-evidence` photos into `./backups`, which is git-ignored. Never commit or publicly share that folder: it contains financial data.
+   - Automate it on Windows with Task Scheduler pointing at `scripts\backup.bat` (weekly is a sensible minimum). Output is appended to `backups\backup.log`.
+   - Also copy `backups` to a second place (USB drive or cloud drive). A backup on the same disk does not survive a disk failure.
+   - A backup you have never restored is unproven. Try a restore into a scratch Supabase project before you depend on it.
+
 ---
 
 ### Step 2: Deploying the Web Application

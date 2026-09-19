@@ -362,3 +362,20 @@ CREATE POLICY "Admin Delete Lot Evidence"
 -- After the first user creates an account at /signup, run the following SQL:
 -- UPDATE public.profiles SET role = 'admin' WHERE id = (SELECT id FROM auth.users WHERE email = 'your-email@company.com');
 -- ==============================================================================
+
+-- ==============================================================================
+-- 11. KEEP-ALIVE HEALTH CHECK (prevents free-tier inactivity pausing)
+-- Called by .github/workflows/supabase-keepalive.yml. Returns only the server time.
+-- Must stay AFTER the "REVOKE ... FROM anon" statements above.
+-- ==============================================================================
+CREATE OR REPLACE FUNCTION public.keepalive()
+RETURNS TIMESTAMPTZ
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT now();
+$$;
+
+REVOKE ALL ON FUNCTION public.keepalive() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.keepalive() TO anon, authenticated;
